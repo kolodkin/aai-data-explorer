@@ -28,10 +28,9 @@ jobs:
         ports:
           - 8123:8123
         # Probe the HTTP interface (8123) — what the backend actually uses —
-        # so the readiness gate matches the app. curl with a wget fallback so
-        # it works whichever is present in the image.
+        # so the readiness gate matches the app.
         options: >-
-          --health-cmd "curl -sf http://localhost:8123/ping || wget -q -O /dev/null http://localhost:8123/ping"
+          --health-cmd "curl -sf http://localhost:8123/ping"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 12
