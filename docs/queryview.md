@@ -8,14 +8,14 @@ page reacts to it inline.
 
 ```
 ┌─────────────────────────────────────────────┐
-│ 🟢 connected - default   ← connection pill    │
+│ 🟢 connected - default   ← connection status  │
 │                                               │
 │                  QueryView                    │
 │        ┌─────────────────────────────┐        │
 │        │  Type a command…            │  ← prompt
 │        └─────────────────────────────┘        │
 │                                               │
-│        Database:  [default] [system] …         │  ← shown once connected
+│        (each mode renders its UI here)        │
 │                                               │
 └─────────────────────────────────────────────┘
 ```
@@ -23,13 +23,14 @@ page reacts to it inline.
 - **Heading** — `QueryView`, centered.
 - **Prompt** — a single text input, centered on the page, auto-focused.
   Submitting (Enter) interprets the typed text as a command.
-- **Inline response** — the result of a command renders directly under the
-  prompt. The prompt itself stays in place; the page does not navigate.
-- **Database picker** — once a steady connection is open, the prompt view also
-  shows the connection's databases to pick from (see [connect.md](./connect.md)).
-- **Connection indicator** — a small pill in the **top-left** corner. It is
-  hidden until a database is selected on the active connection, then shows a
-  green circle 🟢 followed by `connected - <database>`.
+- **Inline response** — each command renders its own UI directly under the
+  prompt (e.g. the connection form and database picker — see
+  [connect.md](./connect.md)). The prompt stays in place; the page does not
+  navigate.
+- **Connection status** — the one element that persists across every mode: a
+  small pill in the **top-left** corner. It is hidden until a database is
+  selected on the active connection, then shows a green circle 🟢 followed by
+  `connected - <database>`.
 
 ## Interaction model
 

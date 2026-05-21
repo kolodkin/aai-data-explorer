@@ -67,13 +67,7 @@ Override the target URL with `BASE_URL=http://localhost:4173 deno task test:e2e`
 
 ## API
 
-| Method | Path                        | Description                                      |
-| ------ | --------------------------- | ------------------------------------------------ |
-| GET    | `/api/health`               | Service health check                             |
-| GET    | `/api/session`              | Current session; auto-connects the latest active connection |
-| POST   | `/api/clickhouse/test`      | Test a connection (test only) `{ host, port, username, password }` |
-| POST   | `/api/clickhouse/connect`   | Open + save + activate a connection `{ name, host, port, username, password }` |
-| POST   | `/api/clickhouse/database`  | Select the active connection's database `{ database }` |
+See [docs/api.md](docs/api.md) for the full endpoint reference.
 
 The single-page prompt UI is described in [docs/queryview.md](docs/queryview.md);
 the `connect clickhouse` flow, SQLite persistence, and session auto-connect are
