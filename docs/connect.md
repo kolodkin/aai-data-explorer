@@ -85,7 +85,12 @@ After connecting, the prompt view shows the list of databases returned by
 
 - sets the session's selected database,
 - persists it on the saved connection (`POST /api/clickhouse/database`),
-- shows the top-left indicator `🟢 connected - <database>`.
+- collapses the picker and shows the top-left indicator `🟢 connected - <database>`,
+- updates the prompt to the completed command `connect <name> db <database>`.
+
+While the picker is open the prompt reads `connect <name> db` (no database yet);
+once a database is chosen it becomes `connect <name> db <database>`, so the
+prompt always matches what's on screen.
 
 ## Persistence (SQLite)
 

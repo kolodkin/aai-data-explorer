@@ -55,7 +55,11 @@ function App() {
       setShowForm(false)
       setHint(null)
       setConnection({ name: data.name, databases, database })
-      setPrompt(`connect ${data.name} db`)
+      setPrompt(
+        database
+          ? `connect ${data.name} db ${database}`
+          : `connect ${data.name} db`,
+      )
     } catch (err) {
       setHint(err instanceof Error ? err.message : 'request failed')
     }
@@ -91,13 +95,15 @@ function App() {
   }
 
   async function selectDatabase(database: string) {
+    if (!connection) return
     const res = await fetch('/api/clickhouse/database', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ database }),
     })
     if (res.ok) {
-      setConnection((c) => (c ? { ...c, database } : c))
+      setConnection({ ...connection, database })
+      setPrompt(`connect ${connection.name} db ${database}`)
     }
   }
 
@@ -222,7 +228,7 @@ function ClickHouseForm({
       data-testid="clickhouse-form"
       className="mt-6 space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
     >
-      <h2 className="text-lg font-semibold">Connect ClickHouse</h2>
+      <h2 className="text-lg font-semibold">New ClickHouse connection</h2>
 
       {(
         [
