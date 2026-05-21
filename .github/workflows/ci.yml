@@ -27,24 +27,17 @@ jobs:
         image: clickhouse/clickhouse-server:24
         ports:
           - 8123:8123
+        # Probe the HTTP interface (8123) — what the backend actually uses —
+        # so the readiness gate matches the app. curl with a wget fallback so
+        # it works whichever is present in the image.
         options: >-
-          --health-cmd "clickhouse-client --query 'SELECT 1'"
+          --health-cmd "curl -sf http://localhost:8123/ping || wget -q -O /dev/null http://localhost:8123/ping"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 12
           --health-start-period 10s
     steps:
       - uses: actions/checkout@v4
-
-      - name: Wait for ClickHouse HTTP interface
-        run: |
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:8123/ping > /dev/null; then
-              echo "ClickHouse is up"; exit 0
-            fi
-            sleep 1
-          done
-          echo "ClickHouse failed to start"; exit 1
 
       - name: Setup Deno
         uses: denoland/setup-deno@v2
