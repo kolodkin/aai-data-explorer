@@ -164,17 +164,15 @@ function saveSelectedDatabase(name: string, database: string): void {
     .run(database, name)
 }
 
-async function latestActiveConnection(): Promise<StoredConnection | null> {
-  const row = db.prepare(
-    `SELECT name, host, port, username, password, database
-     FROM connections ORDER BY last_active_at DESC LIMIT 1`,
-  ).get() as Record<string, unknown> | undefined
+async function rowToConnection(
+  row: Record<string, unknown> | undefined,
+): Promise<StoredConnection | null> {
   if (!row) return null
   let password: string
   try {
     password = await decryptPassword(String(row.password))
   } catch {
-    // Unreadable (key changed / legacy plaintext) — skip auto-connect.
+    // Unreadable (key changed / legacy plaintext) — treat as unavailable.
     return null
   }
   return {
@@ -185,6 +183,29 @@ async function latestActiveConnection(): Promise<StoredConnection | null> {
     password,
     database: row.database == null ? null : String(row.database),
   }
+}
+
+function latestActiveConnection(): Promise<StoredConnection | null> {
+  return rowToConnection(
+    db.prepare(
+      `SELECT name, host, port, username, password, database
+       FROM connections ORDER BY last_active_at DESC LIMIT 1`,
+    ).get() as Record<string, unknown> | undefined,
+  )
+}
+
+function connectionByName(name: string): Promise<StoredConnection | null> {
+  return rowToConnection(
+    db.prepare(
+      `SELECT name, host, port, username, password, database
+       FROM connections WHERE name = ?`,
+    ).get(name) as Record<string, unknown> | undefined,
+  )
+}
+
+function touchConnection(name: string): void {
+  db.prepare(`UPDATE connections SET last_active_at = ? WHERE name = ?`)
+    .run(Date.now(), name)
 }
 
 // --- Session (one active connection, held in memory) ----------------------
@@ -268,6 +289,26 @@ async function handleApi(req: Request, pathname: string): Promise<Response | nul
     const opened = await openConnection(name, parsed.config, null)
     if (!opened.ok) return json({ ok: false, message: opened.message })
     await saveActiveConnection(name, parsed.config)
+    return json({ ok: true, name, databases: session!.databases })
+  }
+
+  // Open a saved connection by name (connect <name>).
+  if (req.method === "POST" && pathname === "/api/clickhouse/open") {
+    const b = (await readJson(req) ?? {}) as Record<string, unknown>
+    const name = typeof b.name === "string" ? b.name.trim() : ""
+    if (!name) return json({ ok: false, message: "name required" }, { status: 400 })
+    const stored = await connectionByName(name)
+    if (!stored) {
+      return json(
+        { ok: false, message: `no connection named "${name}"` },
+        { status: 404 },
+      )
+    }
+    const { name: _n, database: _d, ...config } = stored
+    // Reset the database so `connect <name>` always lands on the picker.
+    const opened = await openConnection(name, config, null)
+    if (!opened.ok) return json({ ok: false, message: opened.message })
+    touchConnection(name)
     return json({ ok: true, name, databases: session!.databases })
   }
 

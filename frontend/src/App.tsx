@@ -30,23 +30,64 @@ function App() {
       .catch(() => {})
   }, [])
 
+  async function openSaved(name: string, targetDb?: string) {
+    try {
+      const res = await fetch('/api/clickhouse/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const data = await res.json()
+      if (!data.ok) {
+        setHint(data.message ?? `no connection named “${name}”`)
+        return
+      }
+      const databases = (data.databases ?? []) as string[]
+      let database: string | null = null
+      if (targetDb && databases.includes(targetDb)) {
+        await fetch('/api/clickhouse/database', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ database: targetDb }),
+        })
+        database = targetDb
+      }
+      setShowForm(false)
+      setHint(null)
+      setConnection({ name: data.name, databases, database })
+      setPrompt(`connect ${data.name} db`)
+    } catch (err) {
+      setHint(err instanceof Error ? err.message : 'request failed')
+    }
+  }
+
   function submitPrompt(e: React.FormEvent) {
     e.preventDefault()
-    const cmd = prompt.trim().toLowerCase()
-    if (!cmd) return
-    if (cmd === 'connect clickhouse') {
+    const raw = prompt.trim()
+    if (!raw) return
+    const lower = raw.toLowerCase()
+    if (lower === 'new clickhouse') {
       setShowForm(true)
       setHint(null)
-    } else {
-      setShowForm(false)
-      setHint(prompt.trim())
+      return
     }
+    if (lower.startsWith('connect ')) {
+      const tokens = raw.slice('connect '.length).trim().split(/\s+/)
+      const name = tokens[0]
+      const targetDb = tokens[1]?.toLowerCase() === 'db' ? tokens[2] : undefined
+      if (name) {
+        void openSaved(name, targetDb)
+        return
+      }
+    }
+    setShowForm(false)
+    setHint(`Unknown command “${raw}”. Try “new clickhouse” or “connect <name>”.`)
   }
 
   function handleConnected(name: string, databases: string[]) {
     setConnection({ name, databases, database: null })
     setShowForm(false)
-    setPrompt('connect clickhouse db')
+    setPrompt(`connect ${name} db`)
   }
 
   async function selectDatabase(database: string) {
@@ -86,7 +127,7 @@ function App() {
             type="text"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Type a command, e.g. connect clickhouse"
+            placeholder="Type a command, e.g. new clickhouse"
             aria-label="Prompt"
             data-testid="prompt-input"
             autoFocus
@@ -99,7 +140,7 @@ function App() {
             className="mt-3 text-center text-sm text-slate-500"
             data-testid="prompt-hint"
           >
-            Unknown command “{hint}”. Try “connect clickhouse”.
+            {hint}
           </p>
         )}
 

@@ -48,9 +48,9 @@ Deno.test("queryview e2e", async (t) => {
       assertEquals(await h1.innerText(), "QueryView")
     })
 
-    await step("typing `connect clickhouse` reveals the connection form", async () => {
+    await step("typing `new clickhouse` reveals the connection form", async () => {
       const input = await page.waitForSelector('[data-testid="prompt-input"]')
-      await input.type("connect clickhouse")
+      await input.type("new clickhouse")
       await page.keyboard.press("Enter")
       await page.waitForSelector('[data-testid="clickhouse-form"]')
       for (const id of ["ch-name", "ch-host", "ch-port", "ch-username", "ch-password"]) {
@@ -95,6 +95,16 @@ Deno.test("queryview e2e", async (t) => {
         await page.waitForSelector('[data-testid="connection-indicator"]')
         const status = await page.waitForSelector('[data-testid="connection-status"]')
         assertStringIncludes(await status.innerText(), "connected - default")
+      })
+
+      await step("`connect <name> db <database>` opens a saved connection", async () => {
+        const input = await page.waitForSelector('[data-testid="prompt-input"]')
+        await input.type("connect clickhouse db system")
+        await page.keyboard.press("Enter")
+        // Indicator is already showing "default"; wait for it to switch.
+        await page.waitForFunction(
+          `document.querySelector('[data-testid="connection-status"]')?.textContent?.includes('connected - system') === true`,
+        )
       })
     }
   } finally {
