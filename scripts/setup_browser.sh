@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run the Astral browser e2e suite locally against a real ClickHouse, the same
 # way CI does: ensure a browser, ensure ClickHouse (via setup_clickhouse.sh),
-# build the SPA, serve it from the Deno backend, and drive a real Chrome.
+# build the SPA, serve it from the FastAPI backend, and drive a real Chrome.
 #
 # Usage:
 #   scripts/setup_browser.sh
@@ -42,6 +42,7 @@ wait_for() { # url label
 }
 
 command -v deno >/dev/null 2>&1 || die "deno not found — install from https://deno.com"
+command -v uv >/dev/null 2>&1 || die "uv not found — install from https://docs.astral.sh/uv/"
 
 # --- Chrome --------------------------------------------------------------
 if [ -z "${CHROME_PATH:-}" ]; then
@@ -72,9 +73,11 @@ log "installing frontend deps"
 ( cd frontend && deno install --allow-scripts )
 log "building SPA"
 deno task build
+log "installing backend deps"
+uv sync --project "$ROOT/backend" --frozen
 log "starting backend (serving built SPA) on :$BACKEND_PORT"
 SERVE_STATIC=1 PORT="$BACKEND_PORT" DB_PATH="${DB_PATH:-$CACHE/queryview.db}" \
-  deno run --allow-net --allow-env --allow-read --allow-write backend/main.ts \
+  uv run --project "$ROOT/backend" --frozen queryview-backend \
   > "$CACHE/backend.log" 2>&1 &
 BACKEND_PID=$!
 wait_for "http://localhost:$BACKEND_PORT/api/health" "backend"

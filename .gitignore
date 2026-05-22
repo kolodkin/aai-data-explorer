@@ -16,6 +16,13 @@ dist/
 .vite/
 *.local
 
+# Python / uv (backend)
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
 # Playwright
 e2e/test-results/
 e2e/playwright-report/
