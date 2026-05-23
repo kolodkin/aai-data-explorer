@@ -3,13 +3,11 @@
 
 Each screenshot is shown under its humanized step title (derived from the file
 name, e.g. ``05-selecting-a-database...png`` -> "5. Selecting a database..."),
-matching the step names from the test run. Output is a self-contained HTML file
-(images embedded as base64, so it is portable as a single artifact); a PDF is
-also rendered when a Chrome/Chromium binary is available.
+matching the step names from the test run. Output is a single self-contained
+HTML file (images embedded as base64), portable as one artifact.
 
 Usage:
-  python build_report.py [--screenshots DIR] [--out FILE]
-                         [--title TITLE] [--pdf] [--no-pdf]
+  python build_report.py [--screenshots DIR] [--out FILE] [--title TITLE]
 
 Defaults: screenshots from $SCREENSHOT_DIR or the first existing of
 .cache/screenshots, e2e/screenshots, ./screenshots; output to
@@ -24,10 +22,7 @@ import datetime as dt
 import html
 import os
 import re
-import shutil
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
@@ -62,22 +57,6 @@ def humanize(filename: str) -> tuple[str | None, str]:
     title = " ".join(w for w in words if w).strip()
     title = title[:1].upper() + title[1:] if title else "Step"
     return number, title
-
-
-def find_chrome() -> str | None:
-    env = os.environ.get("CHROME_PATH")
-    if env and Path(env).exists():
-        return env
-    for name in (
-        "google-chrome",
-        "google-chrome-stable",
-        "chromium",
-        "chromium-browser",
-    ):
-        path = shutil.which(name)
-        if path:
-            return path
-    return None
 
 
 def data_uri(path: Path) -> str:
@@ -163,49 +142,12 @@ def build_html(images: list[Path], title: str) -> str:
 """
 
 
-def render_pdf(html_path: Path, pdf_path: Path, chrome: str) -> bool:
-    with tempfile.TemporaryDirectory() as profile:
-        cmd = [
-            chrome,
-            "--headless=new",
-            "--disable-gpu",
-            "--no-sandbox",
-            "--no-pdf-header-footer",
-            f"--user-data-dir={profile}",
-            f"--print-to-pdf={pdf_path}",
-            html_path.resolve().as_uri(),
-        ]
-        try:
-            proc = subprocess.run(cmd, capture_output=True, timeout=120)
-        except (subprocess.TimeoutExpired, OSError) as err:
-            print(f"PDF render skipped: {err}", file=sys.stderr)
-            return False
-    if not pdf_path.exists():
-        # Older Chrome rejects --headless=new / --no-pdf-header-footer; retry plainly.
-        cmd = [
-            chrome,
-            "--headless",
-            "--disable-gpu",
-            "--no-sandbox",
-            f"--print-to-pdf={pdf_path}",
-            html_path.resolve().as_uri(),
-        ]
-        try:
-            subprocess.run(cmd, capture_output=True, timeout=120)
-        except (subprocess.TimeoutExpired, OSError):
-            pass
-    return pdf_path.exists()
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--screenshots", help="directory of e2e screenshots")
     parser.add_argument("--out", default=".cache/e2e-report/index.html",
-                        help="output HTML path (PDF written alongside)")
+                        help="output HTML path")
     parser.add_argument("--title", default="QueryView E2E Report")
-    pdf = parser.add_mutually_exclusive_group()
-    pdf.add_argument("--pdf", action="store_true", help="require a PDF (fail if no Chrome)")
-    pdf.add_argument("--no-pdf", action="store_true", help="HTML only, never render a PDF")
     args = parser.parse_args()
 
     src = find_screenshots_dir(args.screenshots)
@@ -222,22 +164,6 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(build_html(images, args.title), encoding="utf-8")
     print(f"HTML  -> {out}  ({len(images)} screenshots from {src})")
-
-    if not args.no_pdf:
-        chrome = find_chrome()
-        if chrome:
-            pdf_path = out.with_suffix(".pdf")
-            if render_pdf(out, pdf_path, chrome):
-                print(f"PDF   -> {pdf_path}")
-            elif args.pdf:
-                print("PDF render failed.", file=sys.stderr)
-                return 1
-        elif args.pdf:
-            print("No Chrome/Chromium found for --pdf (set CHROME_PATH).", file=sys.stderr)
-            return 1
-        else:
-            print("PDF skipped: no Chrome/Chromium found (set CHROME_PATH to enable).")
-
     return 0
 
 

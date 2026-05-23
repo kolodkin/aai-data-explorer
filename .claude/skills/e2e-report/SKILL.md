@@ -1,14 +1,13 @@
 ---
 name: e2e-report
-description: Build a single consolidated e2e artifact from the Astral browser screenshots — every screenshot shown under its humanized step title, as a self-contained HTML file plus a PDF (when Chrome is available). Use when the user asks for an "e2e report", "e2e artifact", a document/gallery of the e2e screenshots, or wants to bundle the screenshots from .cache/screenshots (or SCREENSHOT_DIR) into one shareable file.
+description: Build a single consolidated e2e artifact from the Astral browser screenshots — every screenshot shown under its humanized step title, as a self-contained HTML file. Use when the user asks for an "e2e report", "e2e artifact", a document/gallery of the e2e screenshots, or wants to bundle the screenshots from .cache/screenshots (or SCREENSHOT_DIR) into one shareable file.
 ---
 
 # e2e-report
 
 Turns the e2e screenshots into one shareable artifact: each step's screenshot
 under its title (derived from the screenshot file name, matching the step names
-the test prints), as a self-contained HTML file with images embedded, plus a
-PDF rendered through Chrome when one is available.
+the test prints), as a self-contained HTML file with images embedded.
 
 ## When to use
 
@@ -27,16 +26,13 @@ python .claude/skills/e2e-report/build_report.py
 
 It auto-discovers the screenshots directory (first match of `$SCREENSHOT_DIR`,
 `.cache/screenshots`, `e2e/screenshots`, `./screenshots`) and writes
-`.cache/e2e-report/index.html` (plus `index.pdf` if Chrome is found).
+`.cache/e2e-report/index.html`.
 
 Common options:
 
 - `--screenshots DIR` — point at a specific screenshots directory.
-- `--out PATH` — output HTML path; the PDF is written alongside with a `.pdf`
-  suffix.
+- `--out PATH` — output HTML path.
 - `--title "..."` — report heading (default `QueryView E2E Report`).
-- `--pdf` — require a PDF (exit non-zero if no Chrome); `--no-pdf` — HTML only.
-- `CHROME_PATH=/path/to/chrome` — use a specific Chrome/Chromium for the PDF.
 
 ## Notes
 
@@ -49,4 +45,4 @@ Common options:
   surface the generated artifact with the SendUserFile tool rather than
   committing it.
 - To wire it into CI, run this script after the e2e step and upload
-  `.cache/e2e-report/` (HTML+PDF) as a workflow artifact.
+  `.cache/e2e-report/index.html` as a workflow artifact.
