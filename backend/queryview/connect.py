@@ -13,7 +13,9 @@ from pathlib import Path
 from typing import Any
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from sqlmodel import Field, Session, SQLModel, create_engine, select
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlmodel import Field, SQLModel, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from .clickhouse import ChConfig, list_databases
 
@@ -41,20 +43,26 @@ def _db_path() -> Path:
 
 
 _engine = None
+_schema_ready = False
 
 
 def _engine_for_db():
-    """Open the DB and ensure the schema on first use; memoized thereafter. Lazy so
-    importing this module has no side effects (no file is touched until needed)."""
+    """The async SQLAlchemy engine (aiosqlite), memoized. Lazy so importing this
+    module has no side effects — no file is touched until the first query."""
     global _engine
-    if _engine is not None:
-        return _engine
-    engine = create_engine(
-        f"sqlite:///{_db_path()}", connect_args={"check_same_thread": False}
-    )
-    SQLModel.metadata.create_all(engine)
-    _engine = engine
-    return engine
+    if _engine is None:
+        _engine = create_async_engine(f"sqlite+aiosqlite:///{_db_path()}")
+    return _engine
+
+
+async def _ensure_schema() -> None:
+    """Create the tables on first DB use (idempotent)."""
+    global _schema_ready
+    if _schema_ready:
+        return
+    async with _engine_for_db().begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+    _schema_ready = True
 
 
 # --- Password encryption at rest (AES-256-GCM) ----------------------------
@@ -111,11 +119,12 @@ class StoredConnection:
     database: str | None
 
 
-def _save_active_connection(name: str, c: ChConfig) -> None:
+async def _save_active_connection(name: str, c: ChConfig) -> None:
     password = _encrypt_password(c.password)
     now = _now_ms()
-    with Session(_engine_for_db()) as s:
-        row = s.exec(select(Connection).where(Connection.name == name)).first()
+    await _ensure_schema()
+    async with AsyncSession(_engine_for_db()) as s:
+        row = (await s.exec(select(Connection).where(Connection.name == name))).first()
         if row is None:
             row = Connection(
                 name=name,
@@ -133,16 +142,17 @@ def _save_active_connection(name: str, c: ChConfig) -> None:
             row.password = password
             row.last_active_at = now
         s.add(row)
-        s.commit()
+        await s.commit()
 
 
-def _save_selected_database(name: str, database: str) -> None:
-    with Session(_engine_for_db()) as s:
-        row = s.exec(select(Connection).where(Connection.name == name)).first()
+async def _save_selected_database(name: str, database: str) -> None:
+    await _ensure_schema()
+    async with AsyncSession(_engine_for_db()) as s:
+        row = (await s.exec(select(Connection).where(Connection.name == name))).first()
         if row is not None:
             row.database = database
             s.add(row)
-            s.commit()
+            await s.commit()
 
 
 def _row_to_stored(row: Connection | None) -> StoredConnection | None:
@@ -162,27 +172,32 @@ def _row_to_stored(row: Connection | None) -> StoredConnection | None:
     )
 
 
-def _latest_active_connection() -> StoredConnection | None:
-    with Session(_engine_for_db()) as s:
-        row = s.exec(
-            select(Connection).order_by(Connection.last_active_at.desc()).limit(1)
+async def _latest_active_connection() -> StoredConnection | None:
+    await _ensure_schema()
+    async with AsyncSession(_engine_for_db()) as s:
+        row = (
+            await s.exec(
+                select(Connection).order_by(Connection.last_active_at.desc()).limit(1)
+            )
         ).first()
         return _row_to_stored(row)
 
 
-def _connection_by_name(name: str) -> StoredConnection | None:
-    with Session(_engine_for_db()) as s:
-        row = s.exec(select(Connection).where(Connection.name == name)).first()
+async def _connection_by_name(name: str) -> StoredConnection | None:
+    await _ensure_schema()
+    async with AsyncSession(_engine_for_db()) as s:
+        row = (await s.exec(select(Connection).where(Connection.name == name))).first()
         return _row_to_stored(row)
 
 
-def _touch_connection(name: str) -> None:
-    with Session(_engine_for_db()) as s:
-        row = s.exec(select(Connection).where(Connection.name == name)).first()
+async def _touch_connection(name: str) -> None:
+    await _ensure_schema()
+    async with AsyncSession(_engine_for_db()) as s:
+        row = (await s.exec(select(Connection).where(Connection.name == name))).first()
         if row is not None:
             row.last_active_at = _now_ms()
             s.add(row)
-            s.commit()
+            await s.commit()
 
 
 def _now_ms() -> int:
@@ -246,7 +261,7 @@ async def _ensure_session(sid: str) -> None:
     connection so a fresh session resumes where the last one left off."""
     if _get_session_entry(sid):
         return
-    stored = _latest_active_connection()
+    stored = await _latest_active_connection()
     if stored is None:
         return
     state, _ = await _build_session(stored.name, stored.config, stored.database)
@@ -274,13 +289,13 @@ async def connect_new(sid: str, name: str, config: ChConfig) -> dict[str, Any]:
     if state is None:
         return {"ok": False, "message": message}
     _set_session_entry(sid, state)
-    _save_active_connection(name, config)
+    await _save_active_connection(name, config)
     return {"ok": True, "name": name, "databases": state.databases}
 
 
 async def open_saved(sid: str, name: str) -> dict[str, Any]:
     """Open a saved connection by name for this session."""
-    stored = _connection_by_name(name)
+    stored = await _connection_by_name(name)
     if stored is None:
         return {
             "ok": False,
@@ -292,11 +307,11 @@ async def open_saved(sid: str, name: str) -> dict[str, Any]:
     if state is None:
         return {"ok": False, "message": message}
     _set_session_entry(sid, state)
-    _touch_connection(name)
+    await _touch_connection(name)
     return {"ok": True, "name": name, "databases": state.databases}
 
 
-def select_database(sid: str, database: str) -> dict[str, Any]:
+async def select_database(sid: str, database: str) -> dict[str, Any]:
     """Select this session's active connection's database."""
     s = _get_session_entry(sid)
     if s is None:
@@ -304,5 +319,5 @@ def select_database(sid: str, database: str) -> dict[str, Any]:
     if not database or database not in s.databases:
         return {"ok": False, "message": "unknown database", "reason": "unknown"}
     s.database = database
-    _save_selected_database(s.name, database)
+    await _save_selected_database(s.name, database)
     return {"ok": True}

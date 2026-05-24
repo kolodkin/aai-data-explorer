@@ -104,7 +104,7 @@ async def clickhouse_database(request: Request):
     b = await _read_json(request) or {}
     raw_db = b.get("database") if isinstance(b, dict) else None
     database = raw_db if isinstance(raw_db, str) else ""
-    r = select_database(request.state.sid, database)
+    r = await select_database(request.state.sid, database)
     if not r["ok"]:
         return JSONResponse(
             {"ok": False, "message": r["message"]},
