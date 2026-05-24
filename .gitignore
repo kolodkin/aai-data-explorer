@@ -15,8 +15,6 @@ __pycache__/
 /test-results/
 /playwright-report/
 /blob-report/
-/e2e-report/
-.cache/screenshots/
 
 # Local browser-e2e helper (scripts/browser_local.sh): clickhouse binary,
 # data, logs, screenshots.

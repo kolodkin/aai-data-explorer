@@ -11,15 +11,16 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,
+  // CI: blob per shard, merged into one HTML report by `playwright
+  // merge-reports`. Local: the built-in HTML report.
   reporter: process.env.CI
-    ? [["list"], ["junit", {
-      outputFile: process.env.PLAYWRIGHT_JUNIT_OUTPUT_NAME ?? "blob-report/junit.xml",
-    }]]
-    : [["list"]],
+    ? [["list"], ["blob"]]
+    : [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: BASE_URL,
     viewport: { width: 1280, height: 900 },
-    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+    trace: "on",
   },
   projects: [
     {

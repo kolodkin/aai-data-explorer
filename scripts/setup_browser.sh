@@ -72,7 +72,6 @@ wait_for "http://localhost:$BACKEND_PORT/api/health" "backend"
 log "running Playwright e2e tests"
 BASE_URL="http://localhost:$BACKEND_PORT" \
 EXPECT_CLICKHOUSE_OK="$EXPECT_CLICKHOUSE_OK" \
-SCREENSHOT_DIR="${SCREENSHOT_DIR:-$CACHE/screenshots}" \
   npx playwright test
 
-log "done. screenshots in ${SCREENSHOT_DIR:-$CACHE/screenshots}"
+log "done. HTML report in playwright-report/ (open with: npx playwright show-report)"

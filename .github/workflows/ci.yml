@@ -73,21 +73,10 @@ jobs:
           echo "Backend failed to start"; cat backend.log; exit 1
 
       - name: Run Playwright e2e tests
-        id: e2e
         env:
           BASE_URL: http://localhost:8000
           EXPECT_CLICKHOUSE_OK: "1"
-        run: |
-          shard="${{ matrix.shard }}"
-          safe_shard="${shard//\//-}"
-          export SCREENSHOT_DIR="blob-report/screenshots-${safe_shard}"
-          export PLAYWRIGHT_JUNIT_OUTPUT_NAME="blob-report/junit-${safe_shard}.xml"
-          mkdir -p "$SCREENSHOT_DIR"
-          set +e
-          npx playwright test --shard="${shard}" 2>&1 | tee "blob-report/output-${safe_shard}.log"
-          status=${PIPESTATUS[0]}
-          set -e
-          exit $status
+        run: npx playwright test --shard=${{ matrix.shard }}
 
       - name: Stop backend
         if: always()
@@ -119,6 +108,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Download blob reports
         uses: actions/download-artifact@v4
@@ -127,14 +121,14 @@ jobs:
           merge-multiple: true
           path: all-blob-reports
 
-      - name: Build static HTML report
-        run: node scripts/build-e2e-report.mjs all-blob-reports e2e-report
+      - name: Merge blob reports into HTML
+        run: npx playwright merge-reports --reporter html ./all-blob-reports
 
       - name: Check if report exists
         id: check-report
         if: ${{ !cancelled() }}
         run: |
-          if [ -d "e2e-report" ] && [ "$(ls -A e2e-report)" ]; then
+          if [ -d "playwright-report" ] && [ "$(ls -A playwright-report)" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "E2E report directory is present"
           else
@@ -152,7 +146,7 @@ jobs:
         with:
           deploy_key: ${{ secrets.DEPLOY_KEY }}
           external_repository: kolodkin/artifact-view
-          publish_dir: ./e2e-report
+          publish_dir: ./playwright-report
           destination_dir: queryview-/e2e-report/${{ github.run_number }}
           publish_branch: gh-pages
           keep_files: true
