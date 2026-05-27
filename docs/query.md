@@ -56,9 +56,11 @@ their names and ClickHouse types — without scanning data (ClickHouse
   show, so a stale list can't blank the table.
 - **Order by** — pick one or more columns, each **ASC** (default) or **DESC**.
   This is **server-side**, so it only takes effect when the query re-runs: on
-  **Execute** / **Previous** / **Next**, on **Download CSV**, or via the **Apply**
-  button in the order-by section (same as Execute). Column names are
-  backtick-quoted and directions are whitelisted, so the picker can't inject SQL.
+  **Execute** / **Previous** / **Next**, on **Download CSV**, or via the **Run**
+  button in the order-by section. **Run** re-runs the whole query (same as
+  Execute), so it applies the current limit/offset too — not just the ordering.
+  Column names are backtick-quoted and directions are whitelisted, so the picker
+  can't inject SQL.
 
 Editing the SQL doesn't auto-refresh the pickers — click **Fields** again to
 re-describe.

@@ -114,15 +114,15 @@ def test_field_pickers_visibility_and_order_by(seeded_test_db, page: Page) -> No
     assert "name" in header
 
     # Order by name DESC (server-side): selecting it does NOT change results until
-    # Apply (or Execute) re-runs the query. The Apply button in the order-by section
-    # does the same as Execute.
+    # the query re-runs. The order-by Run button re-runs the query (like Execute),
+    # so it also applies the current limit.
     page.locator('[data-testid="orderby-add"][data-col="name"]').click()
     chip = page.locator('[data-testid="orderby-chip"][data-col="name"]')
     expect(chip).to_be_visible()
     chip.get_by_test_id("orderby-dir").click()  # ASC -> DESC
     expect(chip.get_by_test_id("orderby-dir")).to_have_text("DESC")
     page.get_by_test_id("query-limit").fill("2")
-    page.get_by_test_id("orderby-apply").click()
+    page.get_by_test_id("orderby-run").click()
     expect(output).to_contain_text("gamma")
     expect(output).to_contain_text("beta")
     expect(output).not_to_contain_text("alpha")

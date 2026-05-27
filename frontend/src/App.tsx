@@ -778,14 +778,14 @@ function QueryPanel({
               <span className="text-sm font-medium text-slate-700">Order by</span>
               <button
                 type="button"
-                data-testid="orderby-apply"
+                data-testid="orderby-run"
                 onClick={() => void run(offset)}
                 disabled={busy}
                 className="rounded border border-indigo-600 px-2 py-0.5 text-xs font-medium text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-50"
               >
-                Apply
+                Run
               </button>
-              <span className="text-xs text-slate-400">(sorts on Execute / Apply)</span>
+              <span className="text-xs text-slate-400">(re-runs the query)</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {fields.map((f) => {
