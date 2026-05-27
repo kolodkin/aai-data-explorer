@@ -21,8 +21,8 @@ These were settled during brainstorming:
    consumer (not "expose connections as agent tools").
 2. **Targeting** — the browser surfaces its **own** session id with a copyable
    agent command. There is no `list_sessions` enumeration.
-3. **Push effect** — fill the SQL box **and** `limit`/`offset`/`order_by`, then
-   auto-run and render results.
+3. **Push effect** — fill the SQL box **and** `limit`/`offset`/`order_by` **and**
+   the selected (visible) fields, then auto-run and render results.
 4. **Opt-in** — an "Allow remote control" toggle, **off by default**. A session
    is only reachable while armed.
 5. **MCP transport** — FastMCP mounted on the existing FastAPI app
@@ -82,14 +82,17 @@ accessor is added to `connect.py`**.
   `Cache-Control: no-cache`. The browser opens this when it arms; closing the
   `EventSource` disconnects it, which `unregister`s server-side.
 - `POST /api/remote/push` — body `{session_id, query, limit?, offset?,
-  order_by?}`. Validates `session_id` and `query` are non-empty strings; coerces
-  `limit`/`offset` like the existing `/query` handler; passes `order_by` through
-  as a list. Calls `remote.push(session_id, payload)`. Returns `{ok: true}` or
-  `{ok: false, message}` (HTTP 200 either way; an unknown session is a normal
-  not-delivered result, not a server error). Empty `query`/`session_id` → `400`.
+  order_by?, fields?}`. Validates `session_id` and `query` are non-empty
+  strings; coerces `limit`/`offset` like the existing `/query` handler; passes
+  `order_by` through as a list; passes `fields` through as a list of column-name
+  strings (the visible-column selection). Calls `remote.push(session_id,
+  payload)`. Returns `{ok: true}` or `{ok: false, message}` (HTTP 200 either
+  way; an unknown session is a normal not-delivered result, not a server
+  error). Empty `query`/`session_id` → `400`.
 
 The `payload` enqueued and later delivered to the browser is
-`{"type": "query", "query", "limit", "offset", "order_by"}`.
+`{"type": "query", "query", "limit", "offset", "order_by", "fields"}`. `fields`
+is optional: omitted/empty ⇒ show all columns.
 
 ### MCP mount (`backend/queryview/mcp_server.py` + `main.py`)
 
@@ -103,8 +106,12 @@ mcp = FastMCP("queryview", stateless_http=True)
 @mcp.tool()
 async def push_query(session_id: str, query: str,
                      limit: int = 100, offset: int = 0,
-                     order_by: list[dict] | None = None) -> dict:
-    """Push a SQL query to a live QueryView browser session (by session id)."""
+                     order_by: list[dict] | None = None,
+                     fields: list[str] | None = None) -> dict:
+    """Push a SQL query to a live QueryView browser session (by session id).
+
+    fields: optional list of column names to display; omit to show all.
+    """
     ok, message = remote.push(session_id, {...})
     return {"ok": ok, "message": message}
 ```
@@ -161,23 +168,45 @@ New `App` state: `armed: boolean` (default `false`), `remoteId: string | null`,
 
 ### `QueryPanel` changes
 
-- New optional prop `pushed: PushPayload | null`.
+- New optional prop `pushed: PushPayload | null` (carries `query`, `limit`,
+  `offset`, `order_by`, optional `fields`).
 - Refactor `run(nextOffset)` to delegate to a new
-  `runWith(query, limit, offset, orderBy)` that builds the `/api/clickhouse/query`
-  body from its **arguments** (not component state), so a push runs the pushed
-  values without waiting for React state to settle. The existing buttons call
-  `runWith(sql, limit, offset, orderBy)`.
+  `runWith(query, limit, offset, orderBy, selectFields?)` that builds the
+  `/api/clickhouse/query` body from its **arguments** (not component state), so a
+  push runs the pushed values without waiting for React state to settle. The
+  existing buttons call `runWith(sql, limit, offset, orderBy)` (no
+  `selectFields`, leaving visibility untouched as today).
 - A `useEffect` keyed on `pushed`: when it changes, apply it —
   `setSql(query)`, `setLimit`, `setOffset`, `setOrderBy` (defaults when a field
-  is absent) — and call `runWith(...)` with the payload values directly.
+  is absent) — and call `runWith(query, limit, offset, orderBy, fields)`.
+
+### Selected fields from a push
+
+`runWith` receiving `selectFields` makes the pushed selection **authoritative**
+(a push fully specifies the view, with none of the "manually-edited SQL" staleness
+the existing guard protects against). On success it sets, from the returned
+result:
+
+- `setFields(columns.map((name) => ({ name, type: '' })))` — the described-field
+  list synthesized from the actual result columns (types unknown for a push), so
+  the "Select fields" / "Order by" pickers render those columns and the user can
+  adjust afterward;
+- `setVisibleCols(selectFields ∩ columns)` when `selectFields` is non-empty, else
+  all columns (show all).
+
+Because `fields` then covers every returned column, the existing `shownIdx`
+filter (`!fieldNames.has(col) || visible.has(col)`) reduces to "show exactly
+`visibleCols`", so the table renders only the pushed selection. Manual runs pass
+no `selectFields` and leave `fields`/`visibleCols` as-is, so today's behavior is
+unchanged.
 
 ## SSE protocol
 
 Text `event-stream`, UTF-8. Events:
 
 - `event: ready\ndata: {"id":"<remote_id>"}\n\n` — sent once on connect.
-- `event: query\ndata: {"query":...,"limit":...,"offset":...,"order_by":...}\n\n`
-  — one per push.
+- `event: query\ndata: {"query":...,"limit":...,"offset":...,"order_by":...,"fields":...}\n\n`
+  — one per push (`fields` optional).
 - `: ping\n\n` — heartbeat comment (~15s) to keep the connection open and detect
   disconnects.
 
@@ -201,6 +230,10 @@ Text `event-stream`, UTF-8. Events:
 - **Pushed `order_by`/SQL safety** — unchanged: the browser sends them to the
   existing `/api/clickhouse/query`, which already backtick-quotes names and
   whitelists ASC/DESC. The push path never reaches ClickHouse directly.
+- **Pushed `fields`** — names not present in the returned result are ignored
+  (intersection with actual columns); omitted/empty `fields` shows all columns.
+  Visibility is purely client-side, so this never changes what the query
+  returns — only which columns the table renders.
 
 ## Security / scope
 
@@ -221,9 +254,10 @@ unpushable unless the user has explicitly armed it.
 - **e2e (Playwright + httpx, against CI's real ClickHouse)** — connect → select
   a database → open the query panel → click the agent icon → enable the
   toggle → read the displayed session id from the popover → `httpx POST
-  /api/remote/push` with that id and a `SELECT` (+ `limit`/`order_by`) → assert
-  the SQL box shows the pushed query and the results table renders the rows →
-  disable the toggle → assert a push to that id now returns not-delivered.
+  /api/remote/push` with that id and a `SELECT` (+ `limit`/`order_by`/`fields`)
+  → assert the SQL box shows the pushed query, the results table renders the
+  rows, and only the pushed `fields` are shown as columns → disable the toggle →
+  assert a push to that id now returns not-delivered.
 - The single MCP tool is a thin wrapper over the hub the REST path exercises; a
   light check that `/mcp` is mounted (responds to a request) is sufficient.
 
