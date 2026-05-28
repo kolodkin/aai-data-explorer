@@ -76,7 +76,9 @@ def _open_query_panel(page: Page) -> None:
 def test_cell_view_renders_link_and_custom_html(seeded_test_db, page: Page) -> None:
     """Saving a predefined query with a cell_view YAML map renders cells per
     the map: `link` becomes an <a href> using {cell}, `custom` injects the
-    template with {cell} HTML-escaped."""
+    template with {cell} HTML-escaped. Both wrappers carry an automatic
+    data-testid="cell-<col>" so tests can target them without baking testids
+    into the YAML."""
     _open_query_panel(page)
 
     page.get_by_test_id("query-input").fill("SELECT id, name FROM items ORDER BY id LIMIT 2")
@@ -86,7 +88,7 @@ def test_cell_view_renders_link_and_custom_html(seeded_test_db, page: Page) -> N
         "  value: https://example.com/{cell}\n"
         "id:\n"
         "  type: custom\n"
-        "  value: <strong data-testid=\"id-strong\">{cell}</strong>\n"
+        "  value: <strong>{cell}</strong>\n"
     )
 
     # Name the query and Save (Save persists cell_view; loadPredefined refreshes
@@ -104,17 +106,21 @@ def test_cell_view_renders_link_and_custom_html(seeded_test_db, page: Page) -> N
     output = page.get_by_test_id("query-output")
     expect(output).to_be_visible()
 
-    # The `name` column renders as an <a href> built from the template.
-    link = output.locator('a[href="https://example.com/alpha"]')
+    # The `name` column renders as an <a href> built from the template and
+    # carries an auto data-testid="cell-name" on the link itself.
+    link = output.get_by_test_id("cell-name").first
     expect(link).to_be_visible()
     expect(link).to_have_text("alpha")
+    expect(link).to_have_attribute("href", "https://example.com/alpha")
     expect(link).to_have_attribute("target", "_blank")
     expect(link).to_have_attribute("rel", "noopener noreferrer")
 
-    # The `id` column renders the custom template tag with the cell substituted.
-    strong = output.get_by_test_id("id-strong").first
-    expect(strong).to_be_visible()
-    expect(strong).to_have_text("1")
+    # The `id` column renders the custom template wrapped in a span whose
+    # auto data-testid="cell-id" exposes it without test markup in the YAML.
+    custom = output.get_by_test_id("cell-id").first
+    expect(custom).to_be_visible()
+    expect(custom).to_have_text("1")
+    expect(custom.locator("strong")).to_have_text("1")
 
 
 def test_cell_view_only_applies_after_save(seeded_test_db, page: Page) -> None:

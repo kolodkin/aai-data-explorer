@@ -527,6 +527,7 @@ function parseCellViewYaml(text: string | null | undefined): CellViewMap {
 function renderCell(colName: string, raw: string, views: CellViewMap): React.ReactNode {
   const view = views[colName]
   if (!view) return raw
+  const testid = `cell-${colName}`
   if (view.type === 'link') {
     const href = view.value.replaceAll('{cell}', encodeURIComponent(raw))
     let scheme: string
@@ -541,6 +542,7 @@ function renderCell(colName: string, raw: string, views: CellViewMap): React.Rea
         href={href}
         target="_blank"
         rel="noopener noreferrer"
+        data-testid={testid}
         className="text-indigo-300 underline hover:text-indigo-200"
       >
         {raw}
@@ -552,7 +554,7 @@ function renderCell(colName: string, raw: string, views: CellViewMap): React.Rea
     // Cell value is HTML-escaped above so DB content is inert; the template
     // HTML is trusted (anyone who can save a predefined query can inject markup
     // for all viewers — documented in docs/query.md).
-    return <span dangerouslySetInnerHTML={{ __html: html }} />
+    return <span data-testid={testid} dangerouslySetInnerHTML={{ __html: html }} />
   }
   return raw
 }

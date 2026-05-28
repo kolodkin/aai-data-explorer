@@ -127,6 +127,10 @@ Supported types:
 - **`link`** — render the cell as `<a href target="_blank" rel="noopener noreferrer">{cell}</a>`. `{cell}` is URL-encoded into the href; the resolved scheme must be `http`/`https` (anything else falls back to plain text).
 - **`custom`** — render the `value` HTML verbatim with `{cell}` substituted in. The cell value is HTML-escaped before substitution (so DB content can't break out), but the template HTML is **trusted** and is not sanitized. **Anyone who can save a predefined query can inject markup/script that runs in every viewer's browser**, because predefined queries are shared globally with no auth.
 
+Both wrappers (the `<a>` for `link`, the `<span>` for `custom`) automatically
+carry `data-testid="cell-<columnName>"`, so e2e tests can target rendered cells
+without baking testids into the YAML.
+
 Apply timing: rendering uses the **saved** `cell_view` of the **currently
 selected** predefined query — edits to the editor only take effect after
 **Save** (which re-fetches the list). Ad-hoc SQL with no selected predefined

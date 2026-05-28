@@ -167,7 +167,7 @@ def flow_cell_view_link_and_custom(page) -> None:
         "  value: https://example.com/{cell}\n"
         "id:\n"
         "  type: custom\n"
-        "  value: <strong style=\"color:#4f46e5\">{cell}</strong>\n"
+        "  value: <strong style=\"color:#a5b4fc\">{cell}</strong>\n"
     )
     shot(page, t, "cell view YAML in editor")
 
