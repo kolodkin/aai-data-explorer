@@ -78,11 +78,18 @@ def test_cell_view_renders_link_and_custom_html(seeded_test_db, page: Page) -> N
     the map: `link` becomes an <a href> using {cell}, `custom` injects the
     template with {cell} HTML-escaped. Both wrappers carry an automatic
     data-testid="cell-<col>" so tests can target them without baking testids
-    into the YAML."""
+    into the YAML. The YAML is authored in a modal opened from the toolbar."""
     _open_query_panel(page)
 
     page.get_by_test_id("query-input").fill("SELECT id, name FROM items ORDER BY id LIMIT 2")
+
+    # Name the query first — the modal Save is disabled without a name.
+    page.once("dialog", lambda d: d.accept("with-views"))
+    page.get_by_test_id("query-predefined-select").select_option("::new::")
+
+    # Open the cell-view modal and author the YAML.
     page.get_by_test_id("cell-view-toggle").click()
+    expect(page.get_by_test_id("cell-view-modal")).to_be_visible()
     page.get_by_test_id("cell-view-input").fill(
         "name:\n"
         "  type: link\n"
@@ -91,12 +98,9 @@ def test_cell_view_renders_link_and_custom_html(seeded_test_db, page: Page) -> N
         "  type: custom\n"
         "  value: <strong>{cell}</strong>\n"
     )
-
-    # Name the query and Save (Save persists cell_view; loadPredefined refreshes
-    # the saved value into state so rendering can pick it up).
-    page.once("dialog", lambda d: d.accept("with-views"))
-    page.get_by_test_id("query-predefined-select").select_option("::new::")
-    page.get_by_test_id("query-save").click()
+    # Save persists cell_view + sql under the selected name and closes the modal.
+    page.get_by_test_id("cell-view-save").click()
+    expect(page.get_by_test_id("cell-view-modal")).not_to_be_visible()
     expect(
         page.get_by_test_id("query-predefined-select").locator(
             'option[value="with-views"]'
@@ -124,23 +128,30 @@ def test_cell_view_renders_link_and_custom_html(seeded_test_db, page: Page) -> N
     expect(custom.locator("strong")).to_have_text("1")
 
 
-def test_cell_view_only_applies_after_save(seeded_test_db, page: Page) -> None:
-    """Edits to the cell_view editor must NOT affect rendering until Save —
-    rendering uses the saved cell_view of the active predefined query."""
+def test_cell_view_cancel_discards_edits(seeded_test_db, page: Page) -> None:
+    """Cancel in the cell-view modal closes without saving, so rendering still
+    uses the saved cell_view (or none) — author-time edits never leak through."""
     _open_query_panel(page)
 
     page.get_by_test_id("query-input").fill("SELECT name FROM items ORDER BY id LIMIT 1")
-    # Set views in the editor but DO NOT save.
     page.get_by_test_id("cell-view-toggle").click()
+    expect(page.get_by_test_id("cell-view-modal")).to_be_visible()
     page.get_by_test_id("cell-view-input").fill(
         "name:\n  type: link\n  value: https://example.com/{cell}\n"
     )
+    page.get_by_test_id("cell-view-cancel").click()
+    expect(page.get_by_test_id("cell-view-modal")).not_to_be_visible()
+
     page.get_by_test_id("query-run").click()
     output = page.get_by_test_id("query-output")
     expect(output).to_be_visible()
-    # No predefined query selected => no saved cell_view applies => plain text.
+    # Nothing saved => no cell_view applied => plain text, no <a>.
     expect(output.locator("a")).to_have_count(0)
     expect(output).to_contain_text("alpha")
+
+    # Re-opening the modal shows the saved value (empty) — Cancel reverted the edit.
+    page.get_by_test_id("cell-view-toggle").click()
+    expect(page.get_by_test_id("cell-view-input")).to_have_value("")
 
 
 def test_field_pickers_visibility_and_order_by(seeded_test_db, page: Page) -> None:

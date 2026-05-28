@@ -161,8 +161,15 @@ def flow_cell_view_link_and_custom(page) -> None:
     open_panel(page)
 
     page.get_by_test_id("query-input").fill("SELECT id, name FROM items ORDER BY id LIMIT 2")
-    shot(page, t, "panel with cell view collapsed (default)")
+    shot(page, t, "panel - cell view toggle in toolbar (before Min)")
+
+    # Name the query first so the modal Save button is enabled.
+    page.once("dialog", lambda d: d.accept("with-views"))
+    page.get_by_test_id("query-predefined-select").select_option("::new::")
+
+    # Open the modal and author the YAML.
     page.get_by_test_id("cell-view-toggle").click()
+    expect(page.get_by_test_id("cell-view-modal")).to_be_visible()
     page.get_by_test_id("cell-view-input").fill(
         "name:\n"
         "  type: link\n"
@@ -171,17 +178,16 @@ def flow_cell_view_link_and_custom(page) -> None:
         "  type: custom\n"
         "  value: <strong style=\"color:#a5b4fc\">{cell}</strong>\n"
     )
-    shot(page, t, "cell view YAML in editor")
+    shot(page, t, "cell view modal - YAML authored")
 
-    page.once("dialog", lambda d: d.accept("with-views"))
-    page.get_by_test_id("query-predefined-select").select_option("::new::")
-    page.get_by_test_id("query-save").click()
+    page.get_by_test_id("cell-view-save").click()
+    expect(page.get_by_test_id("cell-view-modal")).not_to_be_visible()
     expect(
         page.get_by_test_id("query-predefined-select").locator(
             'option[value="with-views"]'
         )
     ).to_have_count(1)
-    shot(page, t, "saved with cell_view")
+    shot(page, t, "saved - modal closed")
 
     page.get_by_test_id("query-run").click()
     output = page.get_by_test_id("query-output")

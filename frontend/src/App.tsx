@@ -583,6 +583,7 @@ function QueryPanel({
   const [visibleCols, setVisibleCols] = useState<string[]>([])
   const [orderBy, setOrderBy] = useState<OrderCol[]>([])
   const [cellView, setCellView] = useState('')
+  const [cellViewModalOpen, setCellViewModalOpen] = useState(false)
 
   // Applied views come from the *saved* cell_view of the currently selected
   // predefined query — editor edits don't take effect until Save (which
@@ -746,9 +747,9 @@ function QueryPanel({
     }
   }
 
-  async function save() {
+  async function save(): Promise<boolean> {
     const name = selectedName.trim()
-    if (!name) return
+    if (!name) return false
     setBusy(true)
     setError(null)
     try {
@@ -765,14 +766,32 @@ function QueryPanel({
       const data = await res.json()
       if (data.ok) {
         await loadPredefined()
-      } else {
-        setError(data.message ?? 'save failed')
+        return true
       }
+      setError(data.message ?? 'save failed')
+      return false
     } catch (err) {
       setError(err instanceof Error ? err.message : 'request failed')
+      return false
     } finally {
       setBusy(false)
     }
+  }
+
+  // Cell-view modal: opening re-seeds the editor from the selected query's
+  // saved value so Cancel reverts cleanly; Save persists + closes.
+  function openCellViewModal() {
+    const saved = predefined.find((p) => p.query_name === selectedName)?.cell_view ?? ''
+    setCellView(saved)
+    setCellViewModalOpen(true)
+  }
+  function cancelCellView() {
+    const saved = predefined.find((p) => p.query_name === selectedName)?.cell_view ?? ''
+    setCellView(saved)
+    setCellViewModalOpen(false)
+  }
+  async function saveCellView() {
+    if (await save()) setCellViewModalOpen(false)
   }
 
   const { columns, rows: resultRows } =
@@ -856,6 +875,14 @@ function QueryPanel({
       </div>
 
       <div className="flex justify-end gap-1">
+        <button
+          type="button"
+          onClick={openCellViewModal}
+          data-testid="cell-view-toggle"
+          className="glass-toggle mr-2 px-2 py-1 text-xs"
+        >
+          Cell view
+        </button>
         {sizes.map(([label, n, testid]) => (
           <button
             key={testid}
@@ -881,23 +908,56 @@ function QueryPanel({
         }`}
       />
 
-      <details className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-        <summary
-          data-testid="cell-view-toggle"
-          className="cursor-pointer select-none text-xs font-medium text-slate-300"
+      {cellViewModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Cell view editor"
+          data-testid="cell-view-modal"
+          className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-6 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) cancelCellView()
+          }}
         >
-          Cell view (YAML) — applied after Save
-        </summary>
-        <textarea
-          value={cellView}
-          onChange={(e) => setCellView(e.target.value)}
-          aria-label="Cell view YAML"
-          data-testid="cell-view-input"
-          rows={4}
-          placeholder={'cve_id:\n  type: link\n  value: https://nvd.nist.gov/vuln/detail/{cell}'}
-          className="glass-input mt-2 w-full px-3 py-2 font-mono text-xs"
-        />
-      </details>
+          <div className="glass-popover w-full max-w-2xl p-5">
+            <div className="mb-3">
+              <h3 className="text-base font-semibold text-slate-100">Cell view (YAML)</h3>
+              <p className="mt-1 text-xs text-slate-400">
+                Maps column → render rule. Applied on Save.
+              </p>
+            </div>
+            <textarea
+              value={cellView}
+              onChange={(e) => setCellView(e.target.value)}
+              aria-label="Cell view YAML"
+              data-testid="cell-view-input"
+              rows={10}
+              autoFocus
+              placeholder={'cve_id:\n  type: link\n  value: https://nvd.nist.gov/vuln/detail/{cell}'}
+              className="glass-input w-full px-3 py-2 font-mono text-xs"
+            />
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelCellView}
+                data-testid="cell-view-cancel"
+                className="glass-btn px-3 py-1.5 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveCellView()}
+                disabled={busy || !selectedName.trim()}
+                data-testid="cell-view-save"
+                className="glass-btn-primary px-4 py-1.5 text-sm"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <button

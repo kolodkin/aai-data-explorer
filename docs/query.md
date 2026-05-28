@@ -108,10 +108,12 @@ Renaming and deleting predefined queries are not yet supported — see
 ### Cell views
 
 Each predefined query can carry a **`cell_view`** map controlling how result
-cells render. It's authored as YAML in the **"Cell view (YAML)"** editor on the
-query panel and stored as raw text on the predefined query. The map keys are
-column names; each entry has a `type` and a `value` template, and `{cell}` is
-replaced with the cell's raw value:
+cells render. It's authored as YAML in a **"Cell view"** modal — opened from
+the toolbar button just before the **Min** size toggle — and stored as raw
+text on the predefined query. The modal has **Save** (persists + closes) and
+**Cancel** (discards edits + closes); clicking the backdrop also cancels. The
+map keys are column names; each entry has a `type` and a `value` template, and
+`{cell}` is replaced with the cell's raw value:
 
 ```yaml
 cve_id:
