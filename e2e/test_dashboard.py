@@ -29,8 +29,9 @@ _DASHBOARD_HTML = (
 )
 
 
-def test_dashboard_push_and_reopen(seeded_test_db, page: Page, base_url: str) -> None:
+def test_dashboard_push_and_reopen(seeded_test_db, page: Page, base_url: str, shot) -> None:
     _connect_and_select_test_db(page)
+    shot("connected to test db")
 
     # Arm remote control via the agent popover, then read the session id.
     page.get_by_test_id("agent-toggle").click()
@@ -40,6 +41,7 @@ def test_dashboard_push_and_reopen(seeded_test_db, page: Page, base_url: str) ->
     expect(sid_el).to_be_visible()
     session_id = sid_el.inner_text().strip()
     assert session_id
+    shot("remote control armed")
 
     # Push a dashboard the way the MCP tool would (via the REST mirror).
     res = httpx.post(
@@ -64,6 +66,7 @@ def test_dashboard_push_and_reopen(seeded_test_db, page: Page, base_url: str) ->
     expect(page.get_by_test_id("dashboard-view")).to_be_visible()
     frame = page.frame_locator('[data-testid="dashboard-frame"]')
     expect(frame.locator("#out")).to_have_text("alpha,beta,gamma")
+    shot("pushed dashboard rendered")
 
     # Reopen from the store (no live push): navigate directly to the deep link.
     page.goto("/dashboard?name=sales", wait_until="networkidle")
@@ -73,10 +76,11 @@ def test_dashboard_push_and_reopen(seeded_test_db, page: Page, base_url: str) ->
 
     # The dropdown lists the saved dashboard.
     expect(page.get_by_test_id("dashboard-select")).to_contain_text("sales")
+    shot("reopened from store")
 
 
 def test_dashboard_runqueries_error_shows_banner(
-    seeded_test_db, page: Page, base_url: str
+    seeded_test_db, page: Page, base_url: str, shot
 ) -> None:
     # Persist a dashboard whose query is invalid; reopening it should surface a
     # fail-fast error banner instead of rendering the iframe.
@@ -97,3 +101,4 @@ def test_dashboard_runqueries_error_shows_banner(
     expect(page.get_by_test_id("dashboard-error")).to_be_visible()
     expect(page.get_by_test_id("dashboard-error")).to_contain_text("items")
     expect(page.get_by_test_id("dashboard-frame")).to_have_count(0)
+    shot("fail-fast error banner")
