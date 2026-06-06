@@ -528,34 +528,37 @@ function QueryPanel({
     }
     let cancelled = false
     void (async () => {
+      // Independent queries, so fetch them concurrently. Each resolves to its
+      // values or a (param-prefixed) error; the first failing spec — in spec
+      // order, for a deterministic message — blocks the main query.
+      const outcomes = await Promise.all(
+        sqlSpecs.map(async (s) => {
+          try {
+            const res = await fetch('/api/clickhouse/query', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: s.optionsSql, format: 'text' }),
+            })
+            const data = await res.json()
+            if (!data.ok) return { name: s.name, error: data.message ?? 'query failed' }
+            const values = firstColumn(data.output as string)
+            if (values.length === 0) return { name: s.name, error: 'query returned no rows' }
+            return { name: s.name, values }
+          } catch (e) {
+            return { name: s.name, error: e instanceof Error ? e.message : 'request failed' }
+          }
+        }),
+      )
+      if (cancelled) return
       const resolved: Record<string, string[]> = {}
       let err: string | null = null
-      for (const s of sqlSpecs) {
-        try {
-          const res = await fetch('/api/clickhouse/query', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: s.optionsSql, format: 'text' }),
-          })
-          const data = await res.json()
-          if (!data.ok) {
-            err = `options for "${s.name}": ${data.message ?? 'query failed'}`
-            break
-          }
-          const values = firstColumn(data.output as string)
-          if (values.length === 0) {
-            err = `options for "${s.name}": query returned no rows`
-            break
-          }
-          resolved[s.name] = values
-        } catch (e) {
-          err = `options for "${s.name}": ${
-            e instanceof Error ? e.message : 'request failed'
-          }`
+      for (const o of outcomes) {
+        if ('error' in o) {
+          err = `options for "${o.name}": ${o.error}`
           break
         }
+        resolved[o.name] = o.values
       }
-      if (cancelled) return
       setSqlOptions(resolved)
       setOptionsError(err)
     })()
@@ -581,6 +584,10 @@ function QueryPanel({
   const optionsReady =
     optionsError === null &&
     paramSpecs.every((s) => !s.optionsSql || (sqlOptions[s.name]?.length ?? 0) > 0)
+
+  // An options_sql failure (already param-prefixed) takes precedence over a
+  // run-time query error in the banner.
+  const displayError = optionsError ?? error
 
   // Seed each param to its first option, preserving a current selection that is
   // still valid. Re-runs when the resolved defs change (different saved query, a
@@ -1181,9 +1188,9 @@ function QueryPanel({
           </table>
         </div>
       )}
-      {(optionsError ?? error) && (
+      {displayError && (
         <p data-testid="query-error" className="text-sm text-red-300">
-          {optionsError ?? error}
+          {displayError}
         </p>
       )}
     </section>

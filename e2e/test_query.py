@@ -229,29 +229,32 @@ def test_field_pickers_visibility_and_order_by(seeded_test_db, page: Page, shot)
     shot("ordered + limited results (order-by Run)")
 
 
+def _author_params_yaml(page: Page, name: str, sql: str, params_yaml: str) -> None:
+    """Fill the SQL, name the query, and author a `params:` block via the
+    cell-view modal, then Save. Shared by the query-param tests below."""
+    page.get_by_test_id("query-input").fill(sql)
+    page.once("dialog", lambda d: d.accept(name))
+    page.get_by_test_id("query-predefined-select").select_option("::new::")
+    page.get_by_test_id("cell-view-toggle").click()
+    expect(page.get_by_test_id("cell-view-modal")).to_be_visible()
+    page.get_by_test_id("cell-view-input").fill(params_yaml)
+    page.get_by_test_id("cell-view-save").click()
+    expect(page.get_by_test_id("cell-view-modal")).not_to_be_visible()
+
+
 def test_query_param_dropdown_substitutes_value(seeded_test_db, page: Page, shot) -> None:
     """A `params:` block in the cell_view YAML renders a dropdown per param; the
     selected value is substituted into the SQL via {name} (auto-quoted as a
     string) and the query re-runs immediately on change."""
     _open_query_panel(page)
-
-    page.get_by_test_id("query-input").fill(
-        "SELECT name FROM items WHERE name = {sel} ORDER BY id"
-    )
-
-    # Name the query, then author a params block in the cell-view modal.
-    page.once("dialog", lambda d: d.accept("by-name"))
-    page.get_by_test_id("query-predefined-select").select_option("::new::")
-    page.get_by_test_id("cell-view-toggle").click()
-    expect(page.get_by_test_id("cell-view-modal")).to_be_visible()
-    page.get_by_test_id("cell-view-input").fill(
+    _author_params_yaml(
+        page,
+        "by-name",
+        "SELECT name FROM items WHERE name = {sel} ORDER BY id",
         "params:\n"
         "  - name: sel\n"
-        "    options: [alpha, beta, gamma]\n"
+        "    options: [alpha, beta, gamma]\n",
     )
-    shot("cell view modal - params authored")
-    page.get_by_test_id("cell-view-save").click()
-    expect(page.get_by_test_id("cell-view-modal")).not_to_be_visible()
 
     # The dropdown renders with the declared options; default is the first one.
     sel = page.locator('[data-testid="param-select"][data-param="sel"]')
@@ -274,19 +277,6 @@ def test_query_param_dropdown_substitutes_value(seeded_test_db, page: Page, shot
     expect(output).to_contain_text("gamma")
     expect(output).not_to_contain_text("beta")
     shot("query re-run with sel=gamma")
-
-
-def _author_params_yaml(page: Page, name: str, sql: str, params_yaml: str) -> None:
-    """Fill the SQL, name the query, and author a `params:` block via the
-    cell-view modal, then Save. Shared by the options_sql tests below."""
-    page.get_by_test_id("query-input").fill(sql)
-    page.once("dialog", lambda d: d.accept(name))
-    page.get_by_test_id("query-predefined-select").select_option("::new::")
-    page.get_by_test_id("cell-view-toggle").click()
-    expect(page.get_by_test_id("cell-view-modal")).to_be_visible()
-    page.get_by_test_id("cell-view-input").fill(params_yaml)
-    page.get_by_test_id("cell-view-save").click()
-    expect(page.get_by_test_id("cell-view-modal")).not_to_be_visible()
 
 
 def test_query_param_options_sql_populates_dropdown(seeded_test_db, page: Page, shot) -> None:
