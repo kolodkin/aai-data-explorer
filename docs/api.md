@@ -7,8 +7,8 @@ connection-config bodies validate `host` (non-empty) and `port` (integer
 
 **Sessions:** the active connection is per session, keyed by an `HttpOnly`
 `qv_session` cookie (set on the first request). `/session`, `/connect`, `/open`,
-and `/database` all act on the cookie's session, so different browsers connect
-independently. Saved connections themselves are shared (SQLite).
+and `/database` act on the cookie's session, so different browsers connect
+independently. Saved connections are shared (SQLite).
 
 | Method | Path                        | Body                                   | Description |
 | ------ | --------------------------- | -------------------------------------- | ----------- |
@@ -37,9 +37,8 @@ hubs the matching REST endpoints call. See [remote.md](./remote.md) and
 
 ## Persistence
 
-Connections are stored in SQLite (`backend/queryview.db`, override with
-`DB_PATH`) via SQLModel. See [connect.md](./connect.md) for the schema and the
-session / auto-connect model.
+Connections are stored in SQLite via SQLModel. See [connect.md](./connect.md)
+for the schema and the session / auto-connect model.
 
 ## Related docs
 

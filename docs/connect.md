@@ -9,21 +9,20 @@ when a session starts.
 ## Storage & migrations
 
 State lives in a single SQLite file (`queryview.db`, overridable via `DB_PATH`).
-The backend is **single-process** — SQLite is single-writer, so there is one
-process owning the file. The schema is owned by **Alembic**: on startup the
-FastAPI lifespan runs `alembic upgrade head` (via `connect._ensure_schema()`)
-before serving any request, so an Alembic-managed DB is migrated forward in
-place rather than rebuilt. Migrations ship inside the package
-(`backend/queryview/migrations/`). To author a new revision after changing a
-model, from `backend/`:
+The backend is **single-process** — SQLite is single-writer, so one process owns
+the file, and no cross-process migration lock is needed. The schema is owned by
+**Alembic**: on startup the FastAPI lifespan runs `alembic upgrade head` (via
+`connect._ensure_schema()`) before serving any request, so an Alembic-managed DB
+is migrated forward in place rather than rebuilt. Migrations ship inside the
+package (`backend/queryview/migrations/`). To author a new revision after
+changing a model, from `backend/`:
 
 ```
 DB_PATH=/tmp/qv-dev.db uv run alembic revision --autogenerate -m "describe change"
 ```
 
 Review the generated script (column changes use batch mode for SQLite) and
-commit it; the app applies it on next start. Because the app is single-process,
-no cross-process migration lock is needed.
+commit it; the app applies it on next start.
 
 > A DB predating Alembic (created by the old `create_all`, so it has no
 > `alembic_version` table) is not upgraded automatically — delete it and let the
@@ -59,8 +58,6 @@ an unknown name reports `no connection named "<name>"`.
 ## Creating a connection (`new <type>`)
 
 `new clickhouse` renders the connection form below the prompt.
-
-### Connection form
 
 | Field    | Default     | Notes                                          |
 | -------- | ----------- | ---------------------------------------------- |
@@ -101,25 +98,20 @@ picker. Pick a database from the picker to finish.
 
 ## Database picker
 
-After connecting, the prompt view shows the list of databases returned by
-`SHOW DATABASES`. Selecting one:
+After connecting, the prompt view shows the databases returned by
+`SHOW DATABASES`. While the picker is open the prompt reads `connect <name>`.
+Selecting a database:
 
 - sets the session's selected database,
 - persists it on the saved connection (`POST /api/clickhouse/database`),
 - collapses the picker and shows the top-left indicator `🟢 connected - <database>`,
-- clears the prompt and switches its placeholder to `query`, inviting a query.
-
-While the picker is open the prompt reads `connect <name>`; once a database is
-selected the prompt clears and its placeholder (`query`) invites running a query
-(see [query.md](./query.md)).
+- clears the prompt and switches its placeholder to `query`, inviting a query
+  (see [query.md](./query.md)).
 
 ## Persistence (SQLite)
 
-Connection details are stored in a SQLite database (default
-`backend/queryview.db`, override with `DB_PATH`) managed with SQLModel. The
-backend creates the file and its schema on first use.
-
-Schema (the `connections` table SQLModel maps to):
+Connection details are stored via SQLModel in the SQLite database (see
+[Storage & migrations](#storage--migrations)). Schema (the `connections` table):
 
 ```sql
 CREATE TABLE connections (
@@ -138,7 +130,7 @@ CREATE TABLE connections (
 - **Selecting a database** updates `database` for that row.
 - **Latest active** = the row with the greatest `last_active_at`.
 
-### Password encryption
+## Password encryption
 
 The `password` column is **encrypted at rest** with AES-256-GCM; the stored
 value is `base64(iv ‖ ciphertext)` (AES-GCM appends its 16-byte tag to the
@@ -161,23 +153,20 @@ sessions (browsers / profiles) connect independently — one session switching
 connections doesn't affect another. Saved connections themselves are shared
 (stored once in SQLite); the *active* one is per session.
 
-When a session starts (a cookie the backend hasn't seen) it reconnects the
-**latest active** connection from SQLite, so a fresh session resumes where the
-last one left off:
+When a session starts (a cookie the backend hasn't seen), `GET /api/session`
+lazily reconnects the **latest active** connection from SQLite, so a fresh
+session resumes where the last one left off:
 
-- `GET /api/session` returns this session's state and, for an unseen cookie,
-  lazily auto-connects to the latest active connection.
 - On success the SPA loads already connected — prompt + database picker, with
   the previously selected database pre-selected and the indicator shown.
 - On failure (server down, bad credentials) the SPA falls back to the empty
   prompt; the saved connection is left in place to retry.
 
-To open a **specific** connection on load instead of the latest active one,
-pass it as a query param: `…/?connection=<name>` opens that saved connection
-(equivalent to `connect <name>`). The SPA then cleans the URL so a later reload
+To open a **specific** connection on load instead, pass `…/?connection=<name>`
+(equivalent to `connect <name>`); the SPA then cleans the URL so a later reload
 resumes normally.
 
-The per-session state lives in memory, so a backend restart drops it; the next
+Per-session state lives in memory, so a backend restart drops it; the next
 request gets a new session that auto-connects the latest active connection.
 
 ## API
@@ -200,6 +189,6 @@ Basic auth and a 5s timeout.
 ## CI
 
 CI runs a real `clickhouse/clickhouse-server` service container so the e2e suite
-exercises an actual connection: the tests assert that connecting succeeds, a
-database can be selected, the indicator shows `connected - <database>`, and a
-query against a seeded `test` database returns its rows.
+exercises an actual connection: it asserts that connecting succeeds, a database
+can be selected, the indicator shows `connected - <database>`, and a query
+against a seeded `test` database returns its rows.

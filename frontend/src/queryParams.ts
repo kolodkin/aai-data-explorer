@@ -1,23 +1,18 @@
 import yaml from 'js-yaml'
 
-// A dropdown selector with its choices resolved to a concrete list. The chosen
-// value is substituted into the SQL via a `{name}` placeholder. This is what the
-// `<select>` render and applyParams consume — for an `options_sql` param the
-// list is filled in once the query resolves. See docs/query.md.
+// Selector with choices resolved to a concrete list, substituted into SQL via a
+// `{name}` placeholder. See docs/query.md.
 export type ParamDef = { name: string; options: string[] }
 
-// A dropdown selector as declared in a predefined query's cell_view YAML under
-// the reserved `params:` key. Either `options` (a static list) or `optionsSql`
-// (a query whose first column supplies the list) is set, never both.
+// Selector declared under the reserved `params:` key in a query's cell_view YAML.
+// Exactly one of `options` (static) or `optionsSql` (first column of a query) is set.
 export type ParamSpec = {
   name: string
   options?: string[]
   optionsSql?: string
 }
 
-// Parse YAML text into a plain object, or null on a parse error or a
-// non-object/array root. Shared guard for the cell_view YAML, which carries
-// both column-render rules and the `params:` selectors.
+// Parse YAML into a plain object, or null on parse error / non-object root.
 export function parseYamlObject(
   text: string | null | undefined,
 ): Record<string, unknown> | null {
@@ -32,12 +27,9 @@ export function parseYamlObject(
   return doc as Record<string, unknown>
 }
 
-// Parse the `params:` section of the cell_view YAML into selector specs.
-// Mirrors parseCellViewYaml's defensive contract: a parse error, a missing or
-// non-list `params`, or any malformed entry is dropped — a broken config never
-// breaks the panel, it just yields no dropdowns. A param may declare a static
-// `options` list or an `options_sql` query, but declaring both is a config
-// error and drops the entry.
+// Parse the cell_view YAML's `params:` section into selector specs. Defensive: a
+// parse error or malformed entry is dropped, so a broken config yields no
+// dropdowns rather than breaking the panel. Declaring both options keys drops it.
 export function parseQueryParams(text: string | null | undefined): ParamSpec[] {
   const doc = parseYamlObject(text)
   if (!doc) return []
@@ -57,8 +49,7 @@ export function parseQueryParams(text: string | null | undefined): ParamSpec[] {
       continue
     }
     if (hasOptions) {
-      // Keep scalars only; null and nested objects/arrays (all typeof 'object')
-      // are not valid option values.
+      // Keep scalars only; null/objects/arrays (all typeof 'object') aren't valid.
       const options = (o.options as unknown[])
         .filter((v) => typeof v !== 'object')
         .map(String)
@@ -70,9 +61,9 @@ export function parseQueryParams(text: string | null | undefined): ParamSpec[] {
   return out
 }
 
-// Substitute each `{name}` in the SQL with the selected value as a quoted SQL
-// string literal (single quotes doubled). An unselected param falls back to its
-// first option; a placeholder with no matching param is left untouched.
+// Substitute each `{name}` with the selected value as a quoted SQL literal
+// (single quotes doubled). Unselected params fall back to their first option;
+// an unmatched placeholder is left untouched.
 export function applyParams(
   sql: string,
   defs: ParamDef[],

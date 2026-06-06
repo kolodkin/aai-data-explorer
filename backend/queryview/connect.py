@@ -1,6 +1,6 @@
 """Connection domain: the SQLModel/SQLite connection store (passwords encrypted
-at rest) and per-session active connections. No HTTP-server concerns live here;
-the operations return plain results and main.py maps them to responses."""
+at rest) and per-session active connections. No HTTP concerns here — operations
+return plain results that main.py maps to responses."""
 
 from __future__ import annotations
 
@@ -56,8 +56,8 @@ _schema_ready = False
 
 
 def _engine_for_db():
-    """The async SQLAlchemy engine (aiosqlite), memoized. Lazy so importing this
-    module has no side effects — no file is touched until the first query."""
+    """The async SQLAlchemy engine (aiosqlite), memoized and lazy — no file is
+    touched until the first query, so importing this module is side-effect-free."""
     global _engine
     if _engine is None:
         _engine = create_async_engine(f"sqlite+aiosqlite:///{_db_path()}")
@@ -65,10 +65,9 @@ def _engine_for_db():
 
 
 def _alembic_config() -> Config:
-    """Alembic Config built in code (not from a cwd alembic.ini) so migrations
-    run from any working directory and from the packaged wheel. Points at the
-    migrations dir shipped inside this package and injects a *sync* SQLite URL
-    for the current DB_PATH."""
+    """Alembic Config built in code (not a cwd alembic.ini) so migrations run from
+    any directory and from the packaged wheel. Points at the package's migrations
+    dir and injects a *sync* SQLite URL for the current DB_PATH."""
     from alembic.config import Config
 
     cfg = Config()
@@ -80,10 +79,9 @@ def _alembic_config() -> Config:
 
 
 async def _ensure_schema() -> None:
-    """Migrate the DB to head on first use (idempotent). The app is
-    single-process (SQLite is single-writer), so running migrations here — and
-    once more at lifecycle start — needs no cross-process locking. Runs the sync
-    Alembic upgrade inline: this is a startup step, so blocking is intended."""
+    """Migrate the DB to head on first use (idempotent). Single-process by design
+    (SQLite is single-writer), so no cross-process lock is needed. Runs the sync
+    Alembic upgrade inline — blocking is intended for this startup step."""
     global _schema_ready
     if _schema_ready:
         return
@@ -94,9 +92,9 @@ async def _ensure_schema() -> None:
 
 
 # --- Password encryption at rest (AES-256-GCM) ----------------------------
-# The key comes from DB_ENCRYPTION_KEY (base64, 32 bytes) or a generated local
-# key file next to the DB (gitignored). Stored values are base64(iv ‖ ciphertext),
-# where AES-GCM appends its 16-byte tag to the ciphertext.
+# Key from DB_ENCRYPTION_KEY (base64, 32 bytes) or a generated local key file
+# next to the DB (gitignored). Stored value is base64(iv ‖ ciphertext); AES-GCM
+# appends its 16-byte tag to the ciphertext.
 
 
 def _key_path() -> Path:
@@ -248,10 +246,9 @@ class _SessionState:
     database: str | None
 
 
-# Cap the session map and evict the least-recently-used entry so it can't grow
-# unbounded (every fresh cookie adds one). An evicted session transparently
-# rebuilds on its next request via _ensure_session. OrderedDict keeps insertion
-# order, so re-inserting on access moves an entry to the most-recently-used end.
+# LRU-capped so the map can't grow unbounded (every fresh cookie adds one). An
+# evicted session transparently rebuilds on its next request via _ensure_session;
+# OrderedDict + move_to_end tracks recency.
 _sessions: "OrderedDict[str, _SessionState]" = OrderedDict()
 MAX_SESSIONS = int(os.environ.get("MAX_SESSIONS", "1000"))
 

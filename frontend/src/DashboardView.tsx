@@ -13,18 +13,18 @@ type DashboardSummary = { name: string; connection: string; updated_at: number }
 // Column-oriented results map: {query_name: {column_name: values[]}}.
 type Results = Record<string, Record<string, unknown[]>>
 
-// Build the iframe document: a prologue that exposes the results as
-// `window.queries`, then the agent-authored HTML. The JSON has `<` escaped so an
-// embedded `</script>` in result data can't break out of the prologue script.
+// Build the iframe document: a prologue exposing results as `window.queries`,
+// then the agent-authored HTML. JSON `<` is escaped so an embedded `</script>`
+// in result data can't break out of the prologue script.
 function buildSrcDoc(html: string, results: Results): string {
   const safeJson = JSON.stringify(results).replace(/</g, '\\u003c')
   return `<script>window.queries = ${safeJson};</script>\n${html}`
 }
 
 // The dashboard page (`/dashboard?name=x`). Picks a saved dashboard (dropdown or
-// `?name=`), runs its queries against the named connection via /api/runqueries,
-// and renders the agent HTML in a sandboxed iframe with the results injected as
-// `window.queries`. A freshly-pushed dashboard renders without a refetch.
+// `?name=`), runs its queries via /api/runqueries, and renders the agent HTML in
+// a sandboxed iframe with results injected as `window.queries`. A pushed
+// dashboard renders without a refetch.
 function DashboardView({
   pushed,
   onPushConsumed,
@@ -36,16 +36,14 @@ function DashboardView({
   const name = searchParams.get('name') ?? ''
 
   const [dashboards, setDashboards] = useState<DashboardSummary[]>([])
-  // A pushed dashboard is captured locally so consuming it from the shell
-  // doesn't re-trigger the resolve effect below.
+  // Captured locally so consuming the shell push doesn't re-trigger resolve.
   const [localPush, setLocalPush] = useState<DashboardPush | null>(null)
   const [active, setActive] = useState<DashboardPush | null>(null)
   const [results, setResults] = useState<Results | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Load the list for the dropdown (and refresh it whenever a push lands, so a
-  // newly-created dashboard appears).
+  // Load the dropdown list; refresh on each push so a new dashboard appears.
   useEffect(() => {
     let cancelled = false
     fetch('/api/dashboards')
@@ -69,14 +67,13 @@ function DashboardView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pushed])
 
-  // Resolve the selected dashboard (pushed payload if it matches, else the
-  // store), then run its queries. Fail-fast: a non-2xx /api/runqueries response
-  // surfaces as a dashboard-level error and no iframe is rendered.
+  // Resolve the selected dashboard (pushed payload if it matches, else the store),
+  // then run its queries. Fail-fast: a non-2xx /api/runqueries response surfaces
+  // as a dashboard-level error and renders no iframe.
   useEffect(() => {
     let cancelled = false
 
-    // The selected dashboard: the pushed payload if it matches, else the store.
-    // Returns null (and sets an error) if it can't be loaded.
+    // The selected dashboard; returns null (and sets an error) if it can't load.
     async function loadDashboard(): Promise<DashboardPush | null> {
       if (localPush && localPush.name === name) return localPush
       try {

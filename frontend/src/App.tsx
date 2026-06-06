@@ -12,9 +12,8 @@ import {
 import QueryView, { type Connection, type QueryPush } from './QueryView'
 import DashboardView, { type DashboardPush } from './DashboardView'
 
-// The app shell: client-side routing, the connection state shared by every
-// page, the persistent connection pill + agent popover, and the armed / SSE
-// remote-control channel. Pages: /queries (the query workflow) and /dashboard.
+// App shell: routing, shared connection state, the connection pill + agent
+// popover, and the armed/SSE remote-control channel. Pages: /queries, /dashboard.
 function Shell() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -25,8 +24,8 @@ function Shell() {
   const [queryPush, setQueryPush] = useState<QueryPush | null>(null)
   const [dashboardPush, setDashboardPush] = useState<DashboardPush | null>(null)
 
-  // The ?connection= deep-link, captured once before any redirect rewrites the
-  // URL (the `/` route immediately navigates to `/queries`).
+  // The ?connection= deep-link, captured before the `/`→`/queries` redirect
+  // rewrites the URL.
   const initialConnection = useMemo(
     () => new URLSearchParams(window.location.search).get('connection'),
     [],
@@ -54,11 +53,10 @@ function Shell() {
     navigate('/queries')
   }
 
-  // On load: open a connection named explicitly via ?connection=<name>,
-  // otherwise resume the session's last active connection.
+  // On load: open ?connection=<name> if given, else resume the session's last connection.
   useEffect(() => {
     if (initialConnection) {
-      // Async: state is set after the open round-trips, not synchronously here.
+      // Async: state is set after the open round-trips.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       void openConnection(initialConnection)
       return
@@ -79,9 +77,8 @@ function Shell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // When armed, open an SSE channel: `ready` gives this session's id; `query`
-  // and `dashboard` events carry pushed payloads that navigate to the matching
-  // page and hand the payload to it.
+  // When armed, open an SSE channel: `ready` gives the session id; `query` and
+  // `dashboard` events carry payloads that navigate to the matching page.
   useEffect(() => {
     if (!armed) return
     const es = new EventSource('/api/remote/events')

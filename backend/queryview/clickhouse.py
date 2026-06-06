@@ -101,10 +101,10 @@ async def list_databases(c: ChConfig) -> tuple[bool, list[str] | str]:
 async def describe_query(
     c: ChConfig, query: str, database: str | None = None
 ) -> tuple[bool, list[dict[str, str]] | str]:
-    """Describe a query's output columns via ClickHouse `DESCRIBE (<query>)`, which
-    analyzes the query without scanning data. Returns (True, [{"name", "type"}, ...])
-    or (False, message). The output is `TabSeparated`, so each row is name<TAB>type
-    plus columns we ignore (default, comment, codec, ttl)."""
+    """Describe a query's output columns via ClickHouse `DESCRIBE (<query>)` (no
+    data scanned). Returns (True, [{"name", "type"}, ...]) or (False, message).
+    Output is `TabSeparated` rows of name<TAB>type plus trailing columns we ignore
+    (default, comment, codec, ttl)."""
     inner = query.rstrip().rstrip(";")
     r = await ch_query(c, f"DESCRIBE (\n{inner}\n)", database=database, fmt="TabSeparated")
     if not r.ok:
