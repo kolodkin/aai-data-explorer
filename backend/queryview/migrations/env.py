@@ -1,11 +1,10 @@
-"""Alembic environment. Runs with a *sync* SQLite engine (the app's runtime
-engine is async aiosqlite; migrations deliberately use a separate sync
-connection to avoid async-greenlet complexity). Importing the three model
-modules populates SQLModel.metadata so autogenerate sees every table.
+"""Alembic environment. Uses a *sync* SQLite engine (separate from the app's
+async aiosqlite runtime, to avoid async-greenlet complexity). Importing the model
+modules populates SQLModel.metadata so autogenerate sees every table;
 render_as_batch=True is required for SQLite's limited ALTER TABLE.
 
-Only online migrations are wired up — the app and the dev CLI both run
-`alembic upgrade` against a real connection; offline (`--sql`) mode isn't used."""
+Online migrations only — the app and dev CLI both run `alembic upgrade` against a
+real connection; offline (`--sql`) mode isn't used."""
 
 from __future__ import annotations
 

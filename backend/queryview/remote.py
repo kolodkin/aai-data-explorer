@@ -1,6 +1,6 @@
-"""In-memory push hub for the remote-control layer: one message queue per armed
-browser channel, keyed by a random public id. No HTTP-server or ClickHouse
-concerns live here — the SSE framing and disconnect handling live in main.py."""
+"""In-memory push hub for remote control: one message queue per armed browser
+channel, keyed by a random public id. SSE framing and disconnect handling live
+in main.py."""
 
 from __future__ import annotations
 
@@ -21,8 +21,8 @@ _channels: dict[str, _Channel] = {}
 
 def register() -> str:
     """Create a channel for a newly-armed browser session; return its public id.
-    The id is random and unrelated to the qv_session cookie, so the session
-    secret is never exposed to the agent."""
+    The id is random and unrelated to the qv_session cookie, so the session secret
+    is never exposed to the agent."""
     remote_id = secrets.token_hex(8)
     _channels[remote_id] = _Channel()
     return remote_id

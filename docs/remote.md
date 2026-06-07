@@ -13,10 +13,10 @@ session's **id** and a copyable command, e.g.:
 
 > Use the queryview MCP to push queries to QueryView session "a1b2c3".
 
-Paste that into your agent. Turning the toggle off (or closing the tab) disarms
-the session immediately — pushes to its id are then reported as not delivered.
+Turning the toggle off (or closing the tab) disarms the session immediately —
+pushes to its id are then reported as not delivered.
 
-## The MCP tool
+## MCP tools
 
 The backend mounts a FastMCP server (Streamable HTTP) at `/mcp` exposing two
 tools:
@@ -35,7 +35,7 @@ to ClickHouse directly.
 
 ## How it works
 
-The browser opens an SSE stream (`GET /api/remote/events`) when armed; the
+When armed, the browser opens an SSE stream (`GET /api/remote/events`); the
 backend registers an in-memory channel keyed by a random public id (never the
 `qv_session` cookie). `push_query` (and the test-only `POST /api/remote/push`)
 enqueue onto that channel; the SSE stream delivers the payload and the panel

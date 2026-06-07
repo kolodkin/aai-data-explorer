@@ -78,12 +78,11 @@ def _parse_int(value: Any, default: int) -> int:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Bring the schema to head before serving any request. Single-process by
-    # design (SQLite is single-writer), so no cross-process migration lock.
+    # Schema to head before serving any request (single-process, no lock needed).
     await _ensure_schema()
-    # A mounted Starlette sub-app's lifespan is not run by the parent, so run
-    # the MCP session manager here. streamable_http_app() (called at mount,
-    # below) initializes mcp.session_manager before this runs at startup.
+    # A mounted sub-app's lifespan isn't run by the parent, so run the MCP session
+    # manager here. streamable_http_app() (at mount, below) initializes
+    # mcp.session_manager before this runs.
     async with mcp.session_manager.run():
         yield
 
@@ -252,11 +251,10 @@ def _sse(event: str, data: dict[str, Any]) -> bytes:
 
 
 async def _event_stream(remote_id: str, request: Request):
-    """Yield SSE: a `ready` event with the id, then `query`/`dashboard` events as
-    they are pushed, plus a heartbeat. Each pushed payload is emitted under the
-    SSE event named by its `type` field. Polls disconnect every second so
-    disarming (the browser closing the EventSource) unregisters the channel
-    promptly."""
+    """Yield SSE: a `ready` event with the id, then pushed payloads (each under the
+    SSE event named by its `type` field) plus a heartbeat. Polls disconnect every
+    second so disarming (the browser closing the EventSource) unregisters the
+    channel promptly."""
     try:
         yield _sse("ready", {"id": remote_id})
         elapsed = 0.0
@@ -398,8 +396,8 @@ if SERVE_STATIC:
             candidate = None
         if candidate is not None and candidate.is_file():
             return FileResponse(candidate)
-        # SPA fallback: serve index.html for any unknown path so client-side
-        # routing works. The browser still gets a 200 with the SPA shell.
+        # SPA fallback: serve index.html (200) for any unknown path so
+        # client-side routing works.
         return FileResponse(root / "index.html")
 
 else:

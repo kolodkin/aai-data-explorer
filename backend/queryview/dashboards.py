@@ -1,7 +1,7 @@
-"""Dashboard store: globally-shared dashboards (an HTML layout plus a set of
-named SQL queries) keyed by name. Reuses the SQLite engine owned by connect.py,
-mirroring queries.py. Also hosts the shared upsert-and-push helper that both the
-REST endpoint and the MCP tool call, so neither has to know about the other."""
+"""Dashboard store: globally-shared dashboards (HTML layout + named SQL queries)
+keyed by name. Reuses connect.py's SQLite engine, mirroring queries.py. Also
+hosts the shared upsert-and-push helper that both the REST endpoint and the MCP
+tool call."""
 
 from __future__ import annotations
 
@@ -89,9 +89,9 @@ async def _upsert_and_push(
     session_id: str | None,
 ) -> tuple[bool, bool, str]:
     """Persist a dashboard, then (if `session_id` given) push it to that live
-    browser session. Returns (persisted, pushed, message). The push is
-    best-effort: an unknown/inactive session leaves the dashboard saved with
-    pushed=False, mirroring remote.push's contract."""
+    browser session. Returns (persisted, pushed, message). Push is best-effort:
+    an unknown/inactive session leaves it saved with pushed=False, per
+    remote.push's contract."""
     await upsert_dashboard(name, connection, html, queries)
     if session_id:
         ok, message = remote.push(

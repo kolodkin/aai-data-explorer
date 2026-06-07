@@ -1,12 +1,9 @@
 # Querying
 
-Once a database is selected on the active connection, typing `query` opens the
-**query panel** below the prompt. The panel runs SQL against the session's
-selected database, pages through results, saves/loads reusable queries, and
-exports the current page as CSV.
-
-Typing `query` before a database is selected shows the hint
-`Select a database first.`
+Typing `query` (after a database is selected) opens the **query panel**: run SQL
+against the session's selected database, page through results, save/load reusable
+queries, and export the current page as CSV. Before a database is selected,
+`query` shows the hint `Select a database first.`
 
 ## Panel
 
@@ -29,8 +26,8 @@ Typing `query` before a database is selected shows the hint
 In query mode the command **prompt** moves onto the panel's top row, next to the
 predefined-query controls, to save vertical space.
 
-- **SQL textarea** — the query to run. The **Min / S / M / L / XL** toggles change
-  its height; **Min** collapses it to nothing to maximize room for results.
+- **SQL textarea** — the query to run. **Min / S / M / L / XL** change its height;
+  **Min** collapses it to maximize room for results.
 - **Execute** — runs the query at the current offset.
 - **Fields** — introspects the query's output columns (see
   [Fields, selection & ordering](#fields-selection--ordering)).
@@ -44,23 +41,20 @@ predefined-query controls, to save vertical space.
 
 ## Fields, selection & ordering
 
-**Fields** asks the backend to describe the current query's output columns —
-their names and ClickHouse types — without scanning data (ClickHouse
-`DESCRIBE (<query>)`). It populates two pickers from that one list:
+**Fields** describes the current query's output columns (names and ClickHouse
+types) without scanning data (ClickHouse `DESCRIBE (<query>)`), and populates two
+pickers from that list:
 
-- **Select fields** — a toggle per column controlling which columns the results
-  table shows. This is **client-side and immediate**: toggling shows/hides the
-  column on button press with no re-query, and **Download CSV** ignores it (CSV
-  always exports every column). **Select all** / **Clear all** flip every toggle
-  at once. New columns from a query edited since the last **Fields** call always
-  show, so a stale list can't blank the table.
+- **Select fields** — a toggle per column for what the results table shows.
+  **Client-side and immediate**: toggling shows/hides the column with no re-query,
+  and **Download CSV** ignores it (CSV always exports every column). **Select all**
+  / **Clear all** flip every toggle. New columns from a query edited since the last
+  **Fields** call always show, so a stale list can't blank the table.
 - **Order by** — pick one or more columns, each **ASC** (default) or **DESC**.
-  This is **server-side**, so it only takes effect when the query re-runs: on
-  **Execute** / **Previous** / **Next**, on **Download CSV**, or via the **Run**
-  button in the order-by section. **Run** re-runs the whole query (same as
-  Execute), so it applies the current limit/offset too — not just the ordering.
-  Column names are backtick-quoted and directions are whitelisted, so the picker
-  can't inject SQL.
+  **Server-side**, so it takes effect only on a re-run: **Execute** / **Previous** /
+  **Next**, **Download CSV**, or the order-by section's **Run** button (re-runs the
+  whole query like Execute, applying the current limit/offset). Column names are
+  backtick-quoted and directions whitelisted, so the picker can't inject SQL.
 
 Editing the SQL doesn't auto-refresh the pickers — click **Fields** again to
 re-describe.
@@ -80,9 +74,9 @@ So pages are stable only if the query defines its own order — include an
 
 ## Predefined queries
 
-Predefined queries are reusable SQL **shared globally** (not per session),
-keyed by **connection type** (e.g. `clickhouse`). They are stored in the
-`predefined_queries` SQLite table:
+Predefined queries are reusable SQL **shared globally** (not per session), keyed
+by **connection type** (e.g. `clickhouse`), stored in the `predefined_queries`
+SQLite table:
 
 ```sql
 CREATE TABLE predefined_queries (
@@ -95,25 +89,24 @@ CREATE TABLE predefined_queries (
 );
 ```
 
-- The **selector** lists saved queries for the active connection's type;
-  choosing one loads its SQL into the textarea and makes it the active name. Its
-  **+ New name…** item prompts for a fresh name (no separate name field).
-- **Save** stores the textarea's SQL (and the `cell_view` YAML, see below)
-  under the **currently selected name** and refreshes the selector. Saving an
-  existing name **upserts** (overwrites) it.
+- The **selector** lists saved queries for the active connection's type; choosing
+  one loads its SQL into the textarea and makes it the active name. Its **+ New
+  name…** item prompts for a fresh name (no separate name field).
+- **Save** stores the textarea's SQL (and the `cell_view` YAML) under the
+  **currently selected name** and refreshes the selector. Saving an existing name
+  **upserts** (overwrites) it.
 
 Renaming and deleting predefined queries are not yet supported — see
 [future.md](./future.md).
 
-### Cell views
+## Cell views
 
 Each predefined query can carry a **`cell_view`** map controlling how result
-cells render. It's authored as YAML in a **"Cell view"** modal — opened from
-the toolbar button just before the **Min** size toggle — and stored as raw
-text on the predefined query. The modal has **Save** (persists + closes) and
-**Cancel** (discards edits + closes); clicking the backdrop also cancels. The
-map keys are column names; each entry has a `type` and a `value` template, and
-`{cell}` is replaced with the cell's raw value:
+cells render. Author it as YAML in the **"Cell view"** modal (toolbar button just
+before the **Min** toggle), stored as raw text on the query. The modal's **Save**
+persists and closes; **Cancel** or the backdrop discards. Map keys are column
+names; each entry has a `type` and a `value` template, with `{cell}` replaced by
+the cell's raw value:
 
 ```yaml
 cve_id:
@@ -129,24 +122,21 @@ Supported types:
 - **`link`** — render the cell as `<a href target="_blank" rel="noopener noreferrer">{cell}</a>`. `{cell}` is URL-encoded into the href; the resolved scheme must be `http`/`https` (anything else falls back to plain text).
 - **`custom`** — render the `value` HTML verbatim with `{cell}` substituted in. The cell value is HTML-escaped before substitution (so DB content can't break out), but the template HTML is **trusted** and is not sanitized. **Anyone who can save a predefined query can inject markup/script that runs in every viewer's browser**, because predefined queries are shared globally with no auth.
 
-Both wrappers (the `<a>` for `link`, the `<span>` for `custom`) automatically
-carry `data-testid="cell-<columnName>"`, so e2e tests can target rendered cells
-without baking testids into the YAML.
+Both wrappers (the `<a>` for `link`, the `<span>` for `custom`) carry
+`data-testid="cell-<columnName>"`, so e2e tests can target rendered cells without
+baking testids into the YAML.
 
-Apply timing: rendering uses the **saved** `cell_view` of the **currently
-selected** predefined query — edits to the editor only take effect after
-**Save** (which re-fetches the list). Ad-hoc SQL with no selected predefined
-query renders plain.
+Rendering uses the **saved** `cell_view` of the **currently selected** predefined
+query — editor edits take effect only after **Save** (which re-fetches the list).
+Ad-hoc SQL with no selected query renders plain, as does a broken (unparseable or
+unrecognized-shape) `cell_view`.
 
-A broken (unparseable or unrecognized-shape) `cell_view` is ignored: the table
-falls back to plain rendering rather than failing.
-
-### Query parameters
+## Query parameters
 
 A predefined query can declare **dropdown selectors** whose chosen value is
 substituted into the SQL. They live in a reserved **`params:`** key inside the
-same `cell_view` YAML (so `params` is never treated as a column-render rule).
-Each entry has a `name` and a list of `options`:
+`cell_view` YAML (so `params` is never treated as a column-render rule). Each entry
+has a `name` and a list of `options`:
 
 ```yaml
 params:
@@ -160,22 +150,21 @@ With the query:
 select * from events where source = {source}
 ```
 
-a labelled dropdown appears above the SQL textarea, one per param, populated
-with the declared options. The placeholder **`{source}`** is replaced with the
-selected value as a **quoted SQL string** (`source = 'b'`), with embedded single
-quotes doubled. Write the placeholder where a value goes — no surrounding quotes
-of your own. A `{name}` with no matching param is left untouched; a param whose
-`{name}` never appears in the query is harmless.
+a labelled dropdown appears above the SQL textarea, one per param, populated with
+the declared options. The placeholder **`{source}`** is replaced with the selected
+value as a **quoted SQL string** (`source = 'b'`), with embedded single quotes
+doubled — write the placeholder where a value goes, no quotes of your own. A
+`{name}` with no matching param is left untouched; a param whose `{name}` never
+appears in the query is harmless.
 
 **Changing a dropdown re-runs the query immediately** (resetting to offset 0).
 Substitution applies everywhere the query runs — **Execute**, **Previous** /
-**Next**, **Fields** (`DESCRIBE`), and **Download CSV** — so all of them see the
-currently selected values. The first option is the default.
+**Next**, **Fields** (`DESCRIBE`), and **Download CSV**. The first option is the
+default.
 
-#### Options from a query
+## Options from a query (`options_sql`)
 
-Instead of a static `options` list, a param can derive its choices from a query
-with **`options_sql`**:
+Instead of a static `options` list, a param can derive its choices from a query:
 
 ```yaml
 params:
@@ -186,25 +175,24 @@ params:
 The **first column of every row** becomes an option, in the query's own order
 (use `DISTINCT` / `ORDER BY` yourself — results are not de-duplicated or sorted).
 The query runs once against the current connection when the predefined query
-loads, and its results are cached for the session. The first row is the default.
+loads, and results are cached for the session. The first row is the default.
 
 `options` and `options_sql` are **mutually exclusive** — declaring both drops the
 param. If the `options_sql` query **fails or returns no rows**, the param has
-nothing to choose from, so the main query is **blocked** (Execute and the other
-run controls are disabled) and the error banner names the param.
+nothing to choose from, so the main query is **blocked** (run controls disabled)
+and the error banner names the param.
 
-Because values are constrained to the declared `options` (or the rows
-`options_sql` returns) and quoted/escaped on substitution, params stay within the
-existing trust model (the SQL textarea is already sent to the backend as-is). A
-broken or absent `params:` block simply renders no dropdowns.
+Because values are constrained to the declared options (or the `options_sql` rows)
+and quoted/escaped on substitution, params stay within the existing trust model
+(the SQL textarea is already sent to the backend as-is). A broken or absent
+`params:` block renders no dropdowns.
 
 ## Results & CSV
 
-Results come back from ClickHouse as `TabSeparatedWithNames` and render as an
-HTML table (first row = column names). The table scrolls within the panel; wide
-results scroll horizontally. **Download CSV** re-runs the current page asking for
-`CSVWithNames` and saves it as `query.csv` — it exports the current page (not the
-full result set) and always includes every column, regardless of the **Select
+Results come back from ClickHouse as `TabSeparatedWithNames` and render as an HTML
+table (first row = column names), scrolling within the panel (wide results scroll
+horizontally). **Download CSV** re-runs the current page as `CSVWithNames` and saves
+`query.csv` — current page only, always every column regardless of the **Select
 fields** view.
 
 ## API

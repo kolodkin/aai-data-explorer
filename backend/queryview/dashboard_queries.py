@@ -1,7 +1,7 @@
-"""Running a dashboard's named SQL against a connection by name, decoupled from
-any session/cookie. Reads the saved connection (and its stored database) via
-connect.py and talks to ClickHouse via clickhouse.py; the persistence of
-dashboards themselves lives in dashboards.py."""
+"""Run a dashboard's named SQL against a connection by name, decoupled from any
+session/cookie. Reads the saved connection (and its stored database) via
+connect.py, queries via clickhouse.py; dashboard persistence lives in
+dashboards.py."""
 
 from __future__ import annotations
 
@@ -10,16 +10,14 @@ from typing import Any
 from .clickhouse import ch_query
 from .connect import _connection_by_name
 
-# A dashboard query's result is capped at this many rows, matching the 1000-row
-# ceiling on /api/clickhouse/query. Applied as the LIMIT of the paginating
-# subselect that wraps each query.
+# Row cap per dashboard query (matches /api/clickhouse/query's ceiling), applied
+# as the LIMIT of the subselect wrapping each query.
 DASHBOARD_ROW_CAP = 1000
 
 
 def _parse_tsv_columns(text: str) -> dict[str, list[str]]:
     """Parse TabSeparatedWithNames into a column-oriented, insertion-ordered dict
-    `{column_name: [values, …]}`. The first line is the column names; the rest
-    are rows. Empty output yields an empty dict."""
+    `{column_name: [values, …]}` (first line = names, rest = rows). Empty -> {}."""
     if text == "":
         return {}
     lines = text.split("\n")
@@ -35,11 +33,10 @@ def _parse_tsv_columns(text: str) -> dict[str, list[str]]:
 async def run_queries_for_connection(
     name: str, queries: dict[str, str]
 ) -> dict[str, Any]:
-    """Run a dashboard's named queries against a saved connection by name,
-    decoupled from any session/cookie. Fail-fast: an unknown connection, a
-    connection with no selected database, or the first failing query aborts the
-    whole call. On full success returns {"ok": True, "results": {name: {col:
-    [values, …]}}} — column-oriented dicts ready for window.queries."""
+    """Run a dashboard's named queries against a saved connection by name.
+    Fail-fast: an unknown connection, no selected database, or the first failing
+    query aborts the call. On full success returns {"ok": True, "results": {name:
+    {col: [values, …]}}} — column-oriented, ready for window.queries."""
     stored = await _connection_by_name(name)
     if stored is None:
         return {

@@ -3,9 +3,8 @@
 QueryView's main page (`/queries`) is one centered prompt — the user types a
 command and the page reacts to it inline; no sidebar, no toolbars. A second
 top-level page, `/dashboard`, renders agent-authored dashboards (see
-[dashboard.md](./dashboard.md)); a small nav in the corner switches between the
-two, and the connection status pill persists across both. The rest of this doc
-describes the prompt page.
+[dashboard.md](./dashboard.md)); a corner nav switches between the two, and the
+connection status pill persists across both. This doc describes the prompt page.
 
 ## Layout
 
@@ -24,29 +23,21 @@ describes the prompt page.
 ```
 
 - **Heading** — `QueryView`, centered.
-- **Prompt** — a single text input, centered on the page, auto-focused.
-  Submitting (Enter) interprets the typed text as a command.
+- **Prompt** — a single centered, auto-focused text input. Enter interprets the
+  typed text as a command.
 - **Inline response** — each command renders its own UI directly under the
   prompt (e.g. the connection form and database picker — see
   [connect.md](./connect.md)). The prompt stays in place; the page does not
   navigate.
 - **Connection status** — the one element that persists across every mode: a
-  small pill in the **top-left** corner. It is hidden until a database is
-  selected on the active connection, then shows a green circle 🟢 followed by
-  `connected - <database>`.
-  Next to the status pill is an **agent icon** that opens the remote-control
-  popover (opt-in "Allow remote control"); see [remote.md](./remote.md).
-
-## Interaction model
-
-1. The page opens focused on the prompt.
-2. The user types a command and presses Enter.
-3. Recognized commands swap in their own UI below the prompt.
-4. Unrecognized input shows a short hint instead of an error page.
+  pill in the **top-left** corner, hidden until a database is selected, then
+  showing 🟢 `connected - <database>`. Next to it, an **agent icon** opens the
+  remote-control popover (opt-in "Allow remote control"); see
+  [remote.md](./remote.md).
 
 ## Sessions
 
-The active connection is **session state**, not global UI state. Each browser
+The active connection is **session state**, not global UI state: each browser
 session has its own active connection, held at the backend and keyed by a
 cookie; saved connections are shared (SQLite). See [connect.md](./connect.md).
 
@@ -79,6 +70,6 @@ Command matching is case-insensitive and trims surrounding whitespace. See
   command owns the space beneath it.
 - **No dead ends.** Unknown input is guided, never punished.
 - **State is visible.** Once a database is selected, the top-left indicator
-  makes the active connection and database obvious from anywhere on the page.
+  makes the active connection and database obvious from anywhere.
 - **Resumable.** Sessions reconnect to the last active connection on start, so
   the common case needs no typing at all.

@@ -20,9 +20,8 @@ class PredefinedQuery(SQLModel, table=True):
     query_name: str = Field(index=True)
     type: str = Field(index=True)
     query: str
-    # Raw YAML text (column_name -> {type, value}) controlling how cells render.
-    # NULL = no custom views. The backend never parses this; it's interpreted
-    # client-side and matched against result columns by name.
+    # Raw YAML (column_name -> {type, value}) controlling cell rendering; NULL =
+    # none. Never parsed here — interpreted client-side, matched to columns by name.
     cell_view: str | None = Field(default=None)
 
 

@@ -1,7 +1,7 @@
 # Future
 
-Planned work and roadmap items. Each entry is a proposal, not yet implemented —
-the spec lives here until it ships, then moves into the relevant doc.
+Planned work. Each entry is a proposal, not yet implemented — the spec lives
+here until it ships, then moves into the relevant doc.
 
 ## Edit / delete predefined queries
 

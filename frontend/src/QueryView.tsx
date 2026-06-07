@@ -39,9 +39,8 @@ export type QueryPush = {
 // Sentinel value for the predefined dropdown's "new name" item.
 const NEW_NAME_OPTION = '::new::'
 
-// The query workflow page (`/queries`). Connection state and the persistent
-// connection pill + agent popover live in the App shell; this page owns the
-// command prompt and the connect / pick-database / query UI.
+// The query workflow page (`/queries`). The App shell owns connection state;
+// this page owns the command prompt and the connect/pick-database/query UI.
 function QueryView({
   connection,
   setConnection,
@@ -59,8 +58,7 @@ function QueryView({
   const [showForm, setShowForm] = useState(false)
   const [showQuery, setShowQuery] = useState(false)
 
-  // A pushed query arrives via the shell's SSE listener; make sure the panel is
-  // mounted so it can reflect and auto-run it.
+  // Pushed query arrives via the shell's SSE listener; mount the panel to run it.
   useEffect(() => {
     if (pushed && connection?.database) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -157,15 +155,14 @@ function QueryView({
     })
     if (res.ok) {
       setConnection({ ...connection, database })
-      // Database chosen — clear the prompt; the placeholder now invites a query.
+      // Clear the prompt so the placeholder invites a query.
       setPrompt('')
     }
   }
 
   const inQueryMode = showQuery && Boolean(connection?.database)
 
-  // The command prompt. In query mode it joins the panel's top row (alongside the
-  // predefined-query controls) instead of standing on its own, to save vertical space.
+  // Command prompt. In query mode it joins the panel's top row to save space.
   const promptInput = (
     <form onSubmit={submitPrompt} className={inQueryMode ? 'min-w-0 flex-1' : undefined}>
       <input
@@ -387,9 +384,9 @@ function parseTsv(text: string): { columns: string[]; rows: string[][] } {
   return { columns: lines[0].split('\t'), rows: lines.slice(1).map((l) => l.split('\t')) }
 }
 
-// First column of every data row from a TabSeparatedWithNames result — the
-// dropdown options for an `options_sql` param. The header line is dropped, as is
-// the trailing empty line ClickHouse appends, so an empty result yields [].
+// First column of each data row in a TabSeparatedWithNames result — the dropdown
+// options for an `options_sql` param. Header and trailing empty line dropped, so
+// an empty result yields [].
 function firstColumn(text: string): string[] {
   const lines = text.split('\n')
   if (lines[lines.length - 1] === '') lines.pop()
@@ -405,16 +402,15 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;')
 }
 
-// Parse the saved cell_view YAML into a map. A parse error, a non-mapping
-// root, or any entry without a string {type, value} is dropped — a broken
-// config never blanks the table; it just falls through to plain text.
+// Parse the saved cell_view YAML into a map. A parse error or entry without
+// string {type, value} is dropped — broken config falls through to plain text
+// rather than blanking the table.
 function parseCellViewYaml(text: string | null | undefined): CellViewMap {
   const doc = parseYamlObject(text)
   if (!doc) return {}
   const out: CellViewMap = {}
   for (const [k, v] of Object.entries(doc)) {
-    // `params` is reserved for query-parameter dropdowns (see queryParams.ts),
-    // never a column-render rule.
+    // `params` is reserved for query-parameter dropdowns (see queryParams.ts).
     if (k === 'params') continue
     if (v && typeof v === 'object' && !Array.isArray(v)) {
       const o = v as Record<string, unknown>
@@ -453,9 +449,8 @@ function renderCell(colName: string, raw: string, views: CellViewMap): React.Rea
   }
   if (view.type === 'custom') {
     const html = view.value.replaceAll('{cell}', escapeHtml(raw))
-    // Cell value is HTML-escaped above so DB content is inert; the template
-    // HTML is trusted (anyone who can save a predefined query can inject markup
-    // for all viewers — documented in docs/query.md).
+    // Cell value is HTML-escaped above so DB content is inert; template HTML is
+    // trusted (whoever saves a predefined query can inject markup — see docs/query.md).
     return <span data-testid={testid} dangerouslySetInnerHTML={{ __html: html }} />
   }
   return raw
@@ -486,9 +481,8 @@ function QueryPanel({
   const [orderBy, setOrderBy] = useState<OrderCol[]>([])
   const [cellViewModalOpen, setCellViewModalOpen] = useState(false)
 
-  // The saved cell_view of the currently selected predefined query, or '' when
-  // nothing is selected. Single source of truth for rendering, modal seeding,
-  // and re-saves of SQL through the top "Save" button.
+  // Saved cell_view of the selected query, or '' when none. Single source of
+  // truth for rendering, modal seeding, and top-button re-saves.
   const savedCellView = useMemo(
     () => predefined.find((p) => p.query_name === selectedName)?.cell_view ?? '',
     [predefined, selectedName],
@@ -500,23 +494,21 @@ function QueryPanel({
     [savedCellView],
   )
 
-  // Dropdown selectors declared in the saved cell_view YAML's `params:` section.
-  // Each renders a <select> whose value is substituted into the SQL via {name};
-  // an `options_sql` param's choices are resolved by querying (see below).
+  // Selectors from the cell_view YAML's `params:` section. Each renders a
+  // <select> whose value is substituted into the SQL via {name}; `options_sql`
+  // choices are resolved by querying (below).
   const paramSpecs = useMemo<ParamSpec[]>(
     () => parseQueryParams(savedCellView),
     [savedCellView],
   )
   const [paramValues, setParamValues] = useState<Record<string, string>>({})
-  // Resolved choices for `options_sql` params, keyed by param name. An error
-  // message (already prefixed with the param name) blocks the main query.
+  // Resolved choices for `options_sql` params, keyed by name. An error (already
+  // param-prefixed) blocks the main query.
   const [sqlOptions, setSqlOptions] = useState<Record<string, string[]>>({})
   const [optionsError, setOptionsError] = useState<string | null>(null)
 
-  // Resolve every `options_sql` param's choices once the saved query (and thus
-  // its specs) loads. Runs against the current connection via the same query
-  // endpoint the panel uses; results are cached until the specs change. A failed
-  // or empty result records an error, which blocks the main query.
+  // Resolve every `options_sql` param's choices via the panel's query endpoint;
+  // cached until the specs change. A failed/empty result records a blocking error.
   useEffect(() => {
     const sqlSpecs = paramSpecs.filter((s) => s.optionsSql)
     if (sqlSpecs.length === 0) {
@@ -528,9 +520,8 @@ function QueryPanel({
     }
     let cancelled = false
     void (async () => {
-      // Independent queries, so fetch them concurrently. Each resolves to its
-      // values or a (param-prefixed) error; the first failing spec — in spec
-      // order, for a deterministic message — blocks the main query.
+      // Fetch concurrently. Each resolves to values or a (param-prefixed) error;
+      // the first failing spec in spec order blocks the query (deterministic message).
       const outcomes = await Promise.all(
         sqlSpecs.map(async (s) => {
           try {
@@ -567,9 +558,8 @@ function QueryPanel({
     }
   }, [paramSpecs])
 
-  // Specs with their choices resolved to a concrete list: static `options` pass
-  // through; `options_sql` params take their fetched values (empty until ready).
-  // The <select> render, defaults seeding, and applyParams all consume this.
+  // Specs with choices resolved to a concrete list: static `options` pass
+  // through; `options_sql` params take fetched values (empty until ready).
   const paramDefs = useMemo<ParamDef[]>(
     () =>
       paramSpecs.map((s) => ({
@@ -579,20 +569,17 @@ function QueryPanel({
     [paramSpecs, sqlOptions],
   )
 
-  // Block the main query until every `options_sql` param has resolved to a
-  // non-empty list with no error. With no such params this is vacuously true.
+  // Block the query until every `options_sql` param resolves to a non-empty list
+  // with no error. Vacuously true with no such params.
   const optionsReady =
     optionsError === null &&
     paramSpecs.every((s) => !s.optionsSql || (sqlOptions[s.name]?.length ?? 0) > 0)
 
-  // An options_sql failure (already param-prefixed) takes precedence over a
-  // run-time query error in the banner.
+  // An options_sql failure takes precedence over a run-time query error in the banner.
   const displayError = optionsError ?? error
 
-  // Seed each param to its first option, preserving a current selection that is
-  // still valid. Re-runs when the resolved defs change (different saved query, a
-  // Save, or options_sql results arriving), re-seeding defaults without
-  // clobbering live picks.
+  // Seed each param to its first option, preserving a still-valid selection.
+  // Re-runs when the resolved defs change, without clobbering live picks.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setParamValues((prev) => {
@@ -612,7 +599,7 @@ function QueryPanel({
       const data = await res.json()
       setPredefined((data.queries ?? []) as PredefinedQuery[])
     } catch {
-      // a missing list is non-fatal; leave the selector empty
+      // missing list is non-fatal; leave the selector empty
     }
   }, [connectionType])
 
@@ -623,11 +610,11 @@ function QueryPanel({
   }, [loadPredefined])
 
   // Apply a pushed query: reflect it in the controls and run it with the pushed
-  // values directly (not state, which hasn't settled yet).
+  // values directly (not state, which hasn't settled).
   useEffect(() => {
     if (!pushed) return
-    // Don't fire while a param's options_sql is unresolved — the substitution
-    // would be wrong; the push is dropped rather than run against bad params.
+    // Don't fire while a param's options_sql is unresolved — substitution would
+    // be wrong, so drop the push rather than run against bad params.
     if (!optionsReady) return
     const q = pushed.query
     const lim = pushed.limit ?? 100
@@ -641,7 +628,7 @@ function QueryPanel({
     setOrderBy(ord)
     /* eslint-enable react-hooks/set-state-in-effect */
     void runWith(q, lim, off, ord, fld)
-    // Consume the push so re-mounting the panel doesn't re-run a stale query.
+    // Consume the push so re-mounting doesn't re-run a stale query.
     onPushConsumed?.()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pushed])
@@ -659,7 +646,7 @@ function QueryPanel({
       if (data.ok) {
         const next = (data.fields ?? []) as Field[]
         setFields(next)
-        // Default to all columns visible; drop order-by entries no longer present.
+        // Default to all columns visible; drop stale order-by entries.
         setVisibleCols(next.map((f) => f.name))
         setOrderBy((prev) => prev.filter((o) => next.some((f) => f.name === o.name)))
       } else {
@@ -684,8 +671,7 @@ function QueryPanel({
     setError(null)
     try {
       // Substitute {name} placeholders from the param dropdowns. An override is
-      // passed when a dropdown change triggers the run, since its setState
-      // hasn't committed yet.
+      // passed when a dropdown change triggers the run (its setState hasn't committed).
       const query = applyParams(q, paramDefs, paramOverride ?? paramValues)
       const res = await fetch('/api/clickhouse/query', {
         method: 'POST',
@@ -697,9 +683,9 @@ function QueryPanel({
         const text = data.output as string
         setOutput(text)
         setOffset(off)
-        // A pushed selection is authoritative: synthesize the field list from
-        // the actual result columns so the existing visibility filter restricts
-        // the table to exactly the pushed columns (empty/absent => show all).
+        // A pushed selection is authoritative: synthesize the field list from the
+        // result columns so the visibility filter restricts the table to exactly
+        // the pushed columns (empty/absent => show all).
         if (selectFields !== undefined) {
           const cols = parseTsv(text).columns
           setFields(cols.map((name) => ({ name, type: '' })))
@@ -755,9 +741,8 @@ function QueryPanel({
     }
   }
 
-  // Dropdown selection: a saved query loads its SQL and cell_view; the
-  // "new name" item prompts for a fresh name. Either way the chosen name is
-  // what Save writes under.
+  // Dropdown selection: a saved query loads its SQL and cell_view; the "new name"
+  // item prompts for a fresh name. The chosen name is what Save writes under.
   function onSelectName(value: string) {
     if (value === NEW_NAME_OPTION) {
       const name = window.prompt('Save query as (name):', selectedName || '')?.trim()
@@ -769,9 +754,8 @@ function QueryPanel({
     if (q) setSql(q.query)
   }
 
-  // SQL-only saves (the top button) re-persist the existing cell_view as-is;
-  // the modal passes its draft. Returns success so the modal can close only on
-  // a clean persist.
+  // SQL-only saves (top button) re-persist the existing cell_view; the modal
+  // passes its draft. Returns success so the modal closes only on a clean persist.
   async function save(cellViewValue: string = savedCellView): Promise<boolean> {
     const name = selectedName.trim()
     if (!name) return false
@@ -803,8 +787,8 @@ function QueryPanel({
     }
   }
 
-  // Modal owns its draft state (seeded from savedCellView on mount); App just
-  // toggles visibility and forwards the saved value to the backend.
+  // Modal owns its draft state (seeded from savedCellView); we just toggle
+  // visibility and forward the saved value to the backend.
   async function onCellViewSave(value: string) {
     if (await save(value)) setCellViewModalOpen(false)
   }
@@ -812,9 +796,9 @@ function QueryPanel({
   const { columns, rows: resultRows } =
     output !== null ? parseTsv(output) : { columns: [], rows: [] }
 
-  // Filter table columns by client-side visibility. Columns not among the
-  // described fields (e.g. SQL edited since the last describe) always show, so a
-  // stale field list can't blank the table.
+  // Filter table columns by visibility. Columns not among the described fields
+  // (e.g. SQL edited since the last describe) always show, so a stale field list
+  // can't blank the table.
   const fieldNames = new Set(fields.map((f) => f.name))
   const visible = new Set(visibleCols)
   const shownIdx = columns
@@ -905,8 +889,8 @@ function QueryPanel({
                 onChange={(e) => {
                   const next = { ...paramValues, [def.name]: e.target.value }
                   setParamValues(next)
-                  // Pass the new values directly: setParamValues hasn't committed.
-                  // runWith resets the offset (to 0) when the query succeeds.
+                  // Pass new values directly: setParamValues hasn't committed.
+                  // runWith resets offset to 0 when the query succeeds.
                   if (optionsReady) void runWith(sql, limit, 0, orderBy, undefined, next)
                 }}
                 className={inputClass}
