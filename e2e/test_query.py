@@ -1,7 +1,7 @@
 from playwright.sync_api import Page, expect
 
 
-def test_query(seeded_test_db, page: Page, shot) -> None:
+def test_query_flow(seeded_test_db, page: Page, shot) -> None:
     # Connect using the form defaults (host=localhost, port=8123, user=default).
     page.goto("/", wait_until="networkidle")
     shot("landing prompt")
