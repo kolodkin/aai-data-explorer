@@ -1,7 +1,7 @@
 from playwright.sync_api import Page, expect
 
 
-def test_query_against_seeded_db(seeded_test_db, page: Page, shot) -> None:
+def test_query_flow(seeded_test_db, page: Page, shot) -> None:
     # Connect using the form defaults (host=localhost, port=8123, user=default).
     page.goto("/", wait_until="networkidle")
     shot("landing prompt")
@@ -89,7 +89,7 @@ def test_cell_view_renders_link_and_custom_html(seeded_test_db, page: Page, shot
     _open_query_panel(page)
 
     page.get_by_test_id("query-input").fill("SELECT id, name FROM items ORDER BY id LIMIT 2")
-    shot("panel - cell view toggle in toolbar (before Min)")
+    shot("cell view toggle in toolbar")
 
     # Name the query first — the modal Save is disabled without a name.
     page.once("dialog", lambda d: d.accept("with-views"))
